@@ -56,9 +56,19 @@ cd kspider
 pip install -e .
 ```
 
-See `INSTALL.TXT` for platform-specific setup (PATH configuration,
-system library dependencies for `lxml`, etc.) on macOS, Windows, and
-Linux.
+If `pip install` fails while building `lxml`, install its system
+libraries first:
+
+- **macOS**: `brew install libxml2 libxslt`
+- **Debian/Ubuntu**: `sudo apt install libxml2-dev libxslt-dev python3-dev`
+- **Fedora/RHEL**: `sudo dnf install libxml2-devel libxslt-devel`
+
+If the `kspider` command isn't found after install, make sure your
+Python user script directory is on `PATH`:
+
+- **macOS/Linux**: `~/.local/bin` (or `~/Library/Python/3.x/bin` on
+  macOS with the system Python)
+- **Windows**: the `Scripts` folder under `python -m site --user-site`
 
 ### Configuration
 
