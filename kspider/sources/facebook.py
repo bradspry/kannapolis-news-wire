@@ -14,6 +14,7 @@ _BACKOFF = 5
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Find recent public Facebook posts matching query via a Google site search."""
     yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     scoped = f"site:facebook.com {query} after:{yesterday}"
 

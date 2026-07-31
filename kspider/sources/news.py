@@ -15,6 +15,7 @@ _24H = 86400
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Fetch the last 24 hours of Google News RSS results for query."""
     url = f"{_BASE}?{urlencode({'q': query, 'hl': 'en-US', 'gl': 'US', 'ceid': 'US:en'})}"
     feed = feedparser.parse(url)
 

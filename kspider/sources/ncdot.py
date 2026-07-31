@@ -29,11 +29,13 @@ _BBOX = (35.20, 35.85, -80.74, -80.30)
 
 
 def _in_area(lat: float, lon: float) -> bool:
+    """Check whether a coordinate falls within the Cabarrus/Rowan bounding box."""
     lat_min, lat_max, lon_min, lon_max = _BBOX
     return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
 
 def _unix_to_iso(val) -> Optional[str]:
+    """Convert a Unix timestamp to an ISO datetime string, or None if invalid."""
     if val is None:
         return None
     try:
@@ -43,6 +45,7 @@ def _unix_to_iso(val) -> Optional[str]:
 
 
 def search(query: str = "Kannapolis", max_results: int = 50) -> List[SearchResult]:
+    """Fetch NCDOT DriveNC traffic incidents within the local bounding box."""
     api_key = os.environ.get("DRIVENC_API_KEY", "")
     if not api_key:
         raise RuntimeError(

@@ -23,6 +23,7 @@ _BACKOFF = 5
 
 
 def _strip_html(text: str) -> str:
+    """Remove HTML tags and unescape entities, leaving plain text."""
     return html.unescape(re.sub(r"<[^>]+>", "", text or "")).strip()
 
 

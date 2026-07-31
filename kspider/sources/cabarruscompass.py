@@ -15,6 +15,7 @@ _DAYS = 90
 
 
 def _strip_html(text: str) -> str:
+    """Remove HTML tags from a string, leaving plain text."""
     return re.sub(r"<[^>]+>", "", text or "").strip()
 
 

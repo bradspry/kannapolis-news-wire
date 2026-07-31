@@ -54,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_lake_levels_date ON lake_levels(updated_date);
 
 class Database:
     def __init__(self, path: Path = DEFAULT_DB_PATH):
+        """Open (creating if needed) the SQLite database at path and ensure its schema exists."""
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._conn = sqlite3.connect(str(path))
@@ -62,6 +63,7 @@ class Database:
         self._conn.commit()
 
     def close(self) -> None:
+        """Close the underlying SQLite connection."""
         self._conn.close()
 
     def __enter__(self) -> "Database":
@@ -73,6 +75,7 @@ class Database:
     # ------------------------------------------------------------------ writes
 
     def new_run(self, queries: List[str], sources: List[str]) -> int:
+        """Record the start of a search run and return its new run ID."""
         from datetime import datetime
         cur = self._conn.execute(
             "INSERT INTO search_runs (ran_at, queries, sources) VALUES (?, ?, ?)",
@@ -82,6 +85,7 @@ class Database:
         return cur.lastrowid
 
     def insert_results(self, run_id: int, results: List[SearchResult]) -> None:
+        """Bulk-insert search results tied to the given run ID."""
         rows = [
             (
                 run_id,
@@ -111,6 +115,7 @@ class Database:
         offset: int = 0,
         dedupe: bool = False,
     ) -> List[sqlite3.Row]:
+        """Return stored results filtered by query/source/run, newest first."""
         where, params = [], []
         if query:
             where.append("r.query = ?")
@@ -145,6 +150,7 @@ class Database:
         return self._conn.execute(sql, params).fetchall()
 
     def list_runs(self, limit: int = 20) -> List[sqlite3.Row]:
+        """Return the most recent search runs with their result counts."""
         return self._conn.execute(
             """SELECT sr.*, COUNT(r.id) AS result_count
                FROM search_runs sr
@@ -155,11 +161,13 @@ class Database:
         ).fetchall()
 
     def total_results(self) -> int:
+        """Return the total number of stored results across all runs."""
         return self._conn.execute("SELECT COUNT(*) FROM results").fetchone()[0]
 
     # ------------------------------------------------------------ blocked URLs
 
     def block_url(self, url: str) -> None:
+        """Mark a URL as blocked so it can be filtered out of future exports."""
         from datetime import datetime
         self._conn.execute(
             "INSERT OR IGNORE INTO blocked_urls (url, blocked_at) VALUES (?, ?)",
@@ -211,5 +219,6 @@ class Database:
         ).fetchall()
 
     def blocked_url_set(self) -> set:
+        """Return the set of all blocked URLs."""
         rows = self._conn.execute("SELECT url FROM blocked_urls").fetchall()
         return {r["url"] for r in rows}

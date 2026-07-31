@@ -25,6 +25,7 @@ class SpiderConfig:
 
 class Spider:
     def __init__(self, config: SpiderConfig | None = None):
+        """Create a spider with the given config, or defaults if none given."""
         self.config = config or SpiderConfig()
         self._visited: set[str] = set()
         self._host_last_request: dict[str, float] = {}
@@ -34,6 +35,7 @@ class Spider:
         start_url: str,
         on_page: Optional[Callable[[Page], None]] = None,
     ) -> List[Page]:
+        """Breadth-first crawl from start_url, returning all fetched pages."""
         pages: List[Page] = []
         async for page in self._crawl_iter(start_url):
             pages.append(page)
@@ -42,6 +44,7 @@ class Spider:
         return pages
 
     async def _crawl_iter(self, start_url: str) -> AsyncIterator[Page]:
+        """Drive the BFS queue, yielding each fetched HTML page as it's crawled."""
         start_host = urlparse(start_url).netloc
         queue: deque[tuple[str, int]] = deque([(start_url, 0)])
         headers = {"User-Agent": self.config.user_agent, **self.config.headers}
@@ -87,6 +90,7 @@ class Spider:
                         queue.append((link, depth + 1))
 
     async def _polite_delay(self, url: str) -> None:
+        """Sleep as needed so requests to the same host respect config.delay."""
         host = urlparse(url).netloc
         last = self._host_last_request.get(host, 0.0)
         wait = self.config.delay - (time.monotonic() - last)

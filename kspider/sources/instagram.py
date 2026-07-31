@@ -15,6 +15,7 @@ _HASHTAG = "#kannapolis"
 
 
 def _fetch_scoped(scoped: str, query: str, max_results: int) -> List[SearchResult]:
+    """Run one site-scoped Google search query and wrap the results as Instagram hits."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:
@@ -37,6 +38,7 @@ def _fetch_scoped(scoped: str, query: str, max_results: int) -> List[SearchResul
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Find recent public Instagram posts matching query or the local hashtag, deduped by URL."""
     yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     seen: set = set()
     results: List[SearchResult] = []

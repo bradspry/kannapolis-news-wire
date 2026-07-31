@@ -32,6 +32,7 @@ _CURL_HEADERS = [
 
 
 def _fetch(url: str, timeout: int = 20) -> str:
+    """Fetch a URL via curl with browser-like headers to avoid being blocked."""
     proc = subprocess.run(
         ["curl", "-sL", "--max-time", str(timeout), "--http2", "--compressed"] + _CURL_HEADERS + [url],
         capture_output=True, text=True, timeout=timeout + 5,
@@ -44,6 +45,7 @@ def _fetch(url: str, timeout: int = 20) -> str:
 
 
 def _parse_date(text: str) -> Optional[datetime]:
+    """Parse a "Month D, YYYY" meeting date string into a UTC datetime."""
     for fmt in ("%B %d, %Y", "%B %#d, %Y"):
         try:
             return datetime.strptime(text.strip(), fmt).replace(tzinfo=timezone.utc)
@@ -77,6 +79,7 @@ def _parse_detail(html: str, meeting_date: datetime) -> dict:
 
 
 def _build_published_at(date: datetime, time_str: Optional[str]) -> str:
+    """Combine a meeting date with an optional time string into an ISO timestamp."""
     if time_str:
         try:
             t = datetime.strptime(time_str, "%I:%M %p")
@@ -87,6 +90,7 @@ def _build_published_at(date: datetime, time_str: Optional[str]) -> str:
 
 
 def search(query: str = "", max_results: int = 30) -> List[SearchResult]:
+    """Fetch upcoming Cabarrus County Commissioners meetings, with agenda/detail info for near-term ones."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:

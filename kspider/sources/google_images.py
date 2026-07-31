@@ -46,6 +46,7 @@ _UA = (
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Fetch same-day Bing News results for query, sorted by date."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:

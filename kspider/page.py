@@ -17,20 +17,24 @@ class Page:
 
     @property
     def soup(self) -> BeautifulSoup:
+        """Lazily parse and cache the page HTML as a BeautifulSoup tree."""
         if self._soup is None:
             self._soup = BeautifulSoup(self.html, "lxml")
         return self._soup
 
     @property
     def title(self) -> Optional[str]:
+        """Return the page's <title> text, if present."""
         tag = self.soup.find("title")
         return tag.get_text(strip=True) if tag else None
 
     @property
     def text(self) -> str:
+        """Return all visible text on the page, whitespace-joined."""
         return self.soup.get_text(separator=" ", strip=True)
 
     def links(self, base_url: Optional[str] = None) -> list[str]:
+        """Return absolute, fragment-stripped URLs for every <a href> on the page."""
         base = base_url or self.url
         urls = []
         for tag in self.soup.find_all("a", href=True):
@@ -44,4 +48,5 @@ class Page:
         return urls
 
     def select(self, css: str) -> list[str]:
+        """Return the text content of every element matching a CSS selector."""
         return [el.get_text(strip=True) for el in self.soup.select(css)]

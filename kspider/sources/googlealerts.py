@@ -21,10 +21,12 @@ def _unwrap_url(href: str) -> str:
 
 
 def _strip_tags(text: str) -> str:
+    """Remove HTML tags and unescape entities, leaving plain text."""
     return html.unescape(re.sub(r"<[^>]+>", "", text or "")).strip()
 
 
 def search(query: str = "Kannapolis", max_results: int = 30) -> List[SearchResult]:
+    """Fetch entries from a pre-configured Google Alerts RSS feed."""
     feed = feedparser.parse(_FEED_URL)
     results = []
     for entry in feed.entries[:max_results]:

@@ -46,6 +46,7 @@ def crawl(url, depth, max_pages, delay, follow_external, extract, output):
     collected: list = []
 
     def on_page(page: Page) -> None:
+        """Print or collect a single crawled page as it's fetched."""
         if output == "urls":
             click.echo(page.url)
             return
@@ -91,12 +92,14 @@ def search_cmd(query, source, max_results, loop, interval, export_path, refresh_
     sources = list(source) or ALL_SOURCES
 
     def on_progress(q: str, src: str, count: int) -> None:
+        """Print a per-source result count as searches complete."""
         if count < 0:
             click.echo(f"  {src:6s}  ERROR  {q!r}")
         else:
             click.echo(f"  {src:6s}  {count:3d} results  {q!r}")
 
     def run_once() -> None:
+        """Run one search pass, store results, and optionally re-export the dashboard."""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         click.echo(f"\n[{now}] Searching {len(queries)} "
                    f"quer{'y' if len(queries)==1 else 'ies'} × {len(sources)} source(s)")

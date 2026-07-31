@@ -12,10 +12,12 @@ from youtubesearchpython.core.constants import userAgent as _YT_UA
 import httpx as _httpx
 
 def _yt_sync_post(self) -> _httpx.Response:
+    """Replacement for RequestCore.syncPostRequest compatible with httpx>=0.24's proxies API."""
     return _httpx.post(self.url, headers={"User-Agent": _YT_UA},
                        json=self.data, timeout=self.timeout)
 
 def _yt_sync_get(self) -> _httpx.Response:
+    """Replacement for RequestCore.syncGetRequest compatible with httpx>=0.24's proxies API."""
     return _httpx.get(self.url, headers={"User-Agent": _YT_UA},
                       timeout=self.timeout, cookies={"CONSENT": "YES+1"})
 
@@ -29,6 +31,7 @@ _YTRequestCore.syncGetRequest  = _yt_sync_get
 from youtubesearchpython.handlers.componenthandler import ComponentHandler as _YTCH
 
 def _wrap_component_method(fn):
+    """Wrap a component-builder method so a malformed result (missing id) returns None instead of raising."""
     def _safe(self, *args, **kwargs):
         try:
             return fn(self, *args, **kwargs)
@@ -80,6 +83,7 @@ def _parse_relative_time(s: Optional[str]) -> Optional[str]:
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Fetch this week's YouTube videos matching query."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:

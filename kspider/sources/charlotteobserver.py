@@ -15,6 +15,7 @@ _DAYS = 30
 
 
 def search(query: str = "Kannapolis", max_results: int = 30) -> List[SearchResult]:
+    """Fetch Charlotte Observer articles matching query via a Google News RSS site search."""
     q = f"{query} {_SITE}"
     url = f"{_BASE}?{urlencode({'q': q, 'hl': 'en-US', 'gl': 'US', 'ceid': 'US:en'})}"
     feed = feedparser.parse(url)

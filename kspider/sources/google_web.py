@@ -69,6 +69,7 @@ def _strip_tracking(url: str) -> str:
 
 
 def _domain_from_cite(cite_text: str) -> str:
+    """Extract the domain from a Bing result's <cite> breadcrumb text."""
     raw = cite_text.split("›")[0].strip()  # strip breadcrumb › parts
     if raw.startswith("http"):
         return urlparse(raw).netloc or raw
@@ -76,6 +77,7 @@ def _domain_from_cite(cite_text: str) -> str:
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Fetch Bing web search results for query."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:

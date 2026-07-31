@@ -13,6 +13,7 @@ _BACKOFF = 10  # seconds between retries (DDG rate-limits aggressively)
 
 
 def search(query: str, max_results: int = 30) -> List[SearchResult]:
+    """Fetch DuckDuckGo image search results for query."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:

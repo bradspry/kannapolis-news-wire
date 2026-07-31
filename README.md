@@ -20,13 +20,31 @@ you can open in a browser.
 
 ### Sources
 
-- Local government/civic: CivicClerk, City of Kannapolis news, Cabarrus
-  County Commissioners, Concord lake levels, NCDMV, public notices
-- Local news: Cabarrus Compass, Independent Tribune, Salisbury Post,
-  Charlotte Observer
-- General web/search: Bing, Bing News, DuckDuckGo, DuckDuckGo Images,
-  Google News, Google Alerts
-- Social/media: Facebook, Instagram, YouTube
+Pass any of these names to `--source` (repeatable). Sources marked
+"once" run a single time per search regardless of how many `--query`
+values are given; the rest run once per query.
+
+| Source | Runs | Description |
+| --- | --- | --- |
+| `Bing` | per query | Bing web search results. |
+| `Bing News` | per query | Same-day Bing News results, sorted by date. |
+| `CabarrusCommissioners` | once | Upcoming Cabarrus County Board of Commissioners meetings, with agenda/time/location detail for near-term ones. |
+| `CabarrusCompass` | once | Recent posts from The Cabarrus Compass (Substack, local news), via RSS. |
+| `CharlotteObserver` | once | Recent Charlotte Observer articles mentioning the query, via a Google News RSS site search. |
+| `CivicClerk` | once | Upcoming City of Kannapolis government meetings and agendas, from the CivicClerk API. |
+| `ConcordLakeLevels` | once | Current Howell/Coddle Creek lake level readings, scraped from concordnc.gov; also logs history to the `lake_levels` table. |
+| `DuckDuckGo` | per query | Same-day DuckDuckGo news results. |
+| `DuckDuckGo Images` | per query | DuckDuckGo image search results. |
+| `Facebook` | per query | Recent public Facebook posts matching the query, via a Google site search. |
+| `Google Alerts` | once | Entries from a pre-configured Google Alerts RSS feed. |
+| `Google News` | per query | Last-24-hours Google News RSS results. |
+| `IndependentTribune` | once | Recent Kannapolis articles from the Independent Tribune, via its RSS search. |
+| `Instagram` | per query | Recent public Instagram posts matching the query or the local hashtag, via a Google site search. |
+| `KannapolisNC` | once | Latest articles from the City of Kannapolis news page. |
+| `NCDMV` | once | Traffic incidents in the Cabarrus/Rowan area from the NCDOT DriveNC API. Requires `DRIVENC_API_KEY` (see Configuration). |
+| `PublicNotices` | once | Public notices mentioning Kannapolis from the Concord Independent Tribune's notice portal. |
+| `SalisburyPost` | once | Recent Kannapolis articles from the Salisbury Post, via its WordPress REST API. |
+| `YouTube` | per query | This week's YouTube videos matching the query. |
 
 ## Installation
 

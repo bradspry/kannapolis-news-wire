@@ -20,6 +20,7 @@ _BACKOFF = 5
 
 
 def _parse_date(text: str) -> str | None:
+    """Parse an "MM/DD/YYYY" date string into an ISO timestamp."""
     text = text.strip()
     for fmt in ("%m/%d/%Y", "%m/%#d/%Y"):
         try:
@@ -31,6 +32,7 @@ def _parse_date(text: str) -> str | None:
 
 
 def search(query: str = "Kannapolis", max_results: int = 30) -> List[SearchResult]:
+    """Scrape the latest articles from the City of Kannapolis news page."""
     last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(_RETRIES):
         if attempt:
