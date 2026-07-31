@@ -10,13 +10,13 @@ you can open in a browser.
 
 ## Features
 
-- General-purpose site crawler (`kspider crawl`) with depth/page limits,
+- General-purpose site crawler (`crawl`) with depth/page limits,
   CSS-selector extraction, and text/JSON/URL output.
-- Scheduled search across many sources at once (`kspider search`), with
+- Scheduled search across many sources at once (`search`), with
   an optional loop mode that re-runs on an interval.
 - Local SQLite storage of results and run history.
 - Static HTML dashboard export with chip/list views, filtering, search,
-  and dismiss/block of individual stories (`kspider export`).
+  and dismiss/block of individual stories (`export`).
 
 ### Sources
 
@@ -53,7 +53,7 @@ Requires Python 3.9+.
 ```bash
 git clone <this-repo-url>
 cd kspider
-pip install -e .
+pip install -r requirements.txt
 ```
 
 If `pip install` fails while building `lxml`, install its system
@@ -62,13 +62,6 @@ libraries first:
 - **macOS**: `brew install libxml2 libxslt`
 - **Debian/Ubuntu**: `sudo apt install libxml2-dev libxslt-dev python3-dev`
 - **Fedora/RHEL**: `sudo dnf install libxml2-devel libxslt-devel`
-
-If the `kspider` command isn't found after install, make sure your
-Python user script directory is on `PATH`:
-
-- **macOS/Linux**: `~/.local/bin` (or `~/Library/Python/3.x/bin` on
-  macOS with the system Python)
-- **Windows**: the `Scripts` folder under `python -m site --user-site`
 
 ### Configuration
 
@@ -81,19 +74,21 @@ cp .env.example .env
 
 ## Usage
 
+Run commands through `kcat.py`:
+
 ```bash
-kspider --help
+python kcat.py --help
 
-kspider search                        # run a single search across all sources
-kspider search --loop --interval 15   # run every 15 minutes
-kspider search --source CivicClerk    # run a single source only
+python kcat.py search                        # run a single search across all sources
+python kcat.py search --loop --interval 15   # run every 15 minutes
+python kcat.py search --source CivicClerk    # run a single source only
 
-kspider results                       # browse stored results in the terminal
-kspider runs                          # list past search runs
+python kcat.py results                       # browse stored results in the terminal
+python kcat.py runs                          # list past search runs
 
-kspider export --open                 # export the dashboard and open it in a browser
+python kcat.py export --open                 # export the dashboard and open it in a browser
 
-kspider crawl https://example.com     # general-purpose site crawl
+python kcat.py crawl https://example.com     # general-purpose site crawl
 ```
 
 Data is stored in `~/.kspider/results.db`, created automatically on
@@ -102,7 +97,7 @@ first run.
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -r requirements-dev.txt
 pytest
 ```
 

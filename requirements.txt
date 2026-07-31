@@ -1,1 +1,9 @@
--e .
+httpx>=0.27
+beautifulsoup4>=4.12
+lxml>=5.0
+click>=8.1
+ddgs>=1.0
+feedparser>=6.0
+googlesearch-python>=1.2
+youtube-search-python>=1.6
+python-dotenv>=1.0
