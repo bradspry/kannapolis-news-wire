@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KCAT</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <!-- KSPIDER_META -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* source badge colours */
+      --c-ddg:         #de5833;
+      --c-ddg-images:  #16a34a;
+      --c-bing:        #008272;
+      --c-bing-news:   #005da6;
+      --c-kannapolis:    #003087;
+      --c-google-alerts: #fbbc04;
+      --c-google-news: #1a73e8;
+      --c-facebook:    #1877f2;
+      --c-instagram:   #e1306c;
+      --c-youtube:     #ff0000;
+      --c-civicclerk:    #0d7377;
+      --c-publicnotices: #6a1e6e;
+      --c-ncdmv:              #c8102e;
+      --c-charlotte-observer:    #7b1313;
+      --c-cabarrus-commissioners: #1a4a2e;
+      --c-concord-lake-levels: #0e6494;
+      --c-all:    #606078;
+      /* dark theme — tuxedo cat palette */
+      --accent:   #e888a0;   /* cat nose / ear pink */
+      --bg:       #0d0d14;   /* deep navy-black, like the cat in shadow */
+      --surface:  #16161f;   /* cards, header, sidebar */
+      --surface-2:#1e1e2a;   /* slightly elevated surfaces */
+      --border:   #26263a;
+      --text:     #e8e8f2;   /* near-white — cat's white patches */
+      --text-2:   #8888a0;
+      --text-3:   #4a4a65;
+      --sidebar-w: 224px;
+      --header-h:  96px;
+      --radius:    10px;
+      --shadow:    0 1px 4px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
+      --shadow-lg: 0 4px 16px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.5);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    /* ── Layout ───────────────────────────────────────── */
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; background: var(--bg); }
+
+    /* ── Header ───────────────────────────────────────── */
+    .header {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      flex-shrink: 0;
+      box-shadow: var(--shadow);
+      z-index: 10;
+    }
+
+    .header-brand {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .header-brand em { color: var(--accent); font-style: normal; }
+    .cat-lid {
+      transform-box: fill-box;
+      transform-origin: top center;
+      transform: scaleY(0);
+      transition: transform 0.15s ease-out;
+    }
+    .cat-lid.closed {
+      transform: scaleY(1);
+      transition: transform 0.08s ease-in;
+    }
+
+    .header-meta {
+      font-size: 12px;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+
+    .header-spacer { flex: 1; }
+
+    /* ── Widgets ─────────────────────────────────────── */
+    .widgets {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+      padding-left: 14px;
+      border-left: 1px solid var(--border);
+    }
+    .widget-weather-cur {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    .weather-row1 {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .weather-icon { font-size: 17px; line-height: 1; }
+    .weather-temp { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; }
+    .weather-desc { font-size: 10px; color: rgba(255,255,255,.6); white-space: nowrap; }
+
+    .btn {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .12s, box-shadow .12s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--bg); box-shadow: var(--shadow); }
+    .btn:active { background: var(--border); }
+
+    /* ── App shell ────────────────────────────────────── */
+    .shell { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 10px 0 32px;
+    }
+
+    .nav-section { margin-bottom: 4px; }
+
+    .nav-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 14px 18px 6px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 8px 18px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13.5px;
+      color: var(--text);
+      transition: background .1s;
+      position: relative;
+    }
+    .nav-btn:hover { background: var(--bg); }
+    .nav-btn.active {
+      background: rgba(232, 136, 160, 0.10);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .nav-btn.active .nav-dot { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px currentColor; }
+    .nav-btn.active .nav-count { background: rgba(232, 136, 160, 0.15); color: var(--accent); }
+
+    .nav-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .nav-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nav-count {
+      font-size: 11.5px;
+      color: var(--text-3);
+      background: var(--bg);
+      padding: 1px 7px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 18px;
+    }
+
+    /* ── Main content ─────────────────────────────────── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* ── Toolbar ──────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 420px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 16px;
+      color: var(--text-3);
+      pointer-events: none;
+      line-height: 1;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 14px 8px 36px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      font-size: 14px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(232, 136, 160, .18);
+    }
+    .search-input::placeholder { color: var(--text-3); }
+
+    .count-label {
+      font-size: 13px;
+      color: var(--text-3);
+      white-space: nowrap;
+      margin-left: 4px;
+    }
+
+    /* ── Chip grid ────────────────────────────────────── */
+    .chip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Chip ─────────────────────────────────────────── */
+    .chip {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: var(--shadow);
+      transition: box-shadow .15s, transform .12s;
+      cursor: pointer;
+    }
+    .chip:hover {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    .chip:active { transform: translateY(0); }
+
+    .chip-dismiss {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: none;
+      background: #e53935;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .15s, background .15s;
+      z-index: 2;
+      flex-shrink: 0;
+    }
+    .chip:hover .chip-dismiss,
+    .list-item:hover .chip-dismiss { opacity: 1; }
+    .chip-dismiss:hover { background: #c62828; }
+    .chip.is-blocked, .list-item.is-blocked { opacity: 0.55; outline: 2px dashed #e53935; outline-offset: -2px; }
+    .chip-unblock {
+      position: absolute; top: 6px; right: 6px;
+      background: #1976d2; color: #fff; border: none; border-radius: 12px;
+      font-size: 11px; font-weight: 600; padding: 3px 9px; cursor: pointer;
+      opacity: 0; transition: opacity .15s; white-space: nowrap; z-index: 2;
+    }
+    .chip:hover .chip-unblock, .list-item:hover .chip-unblock { opacity: 1; }
+    .btn-show-blocked-active { background: #1976d2 !important; color: #fff !important; border-color: #1976d2 !important; }
+    .chip-share {
+      position: absolute; bottom: 8px; right: 8px;
+      background: #444460; color: #fff; border: none; border-radius: 12px;
+      font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer;
+      opacity: 0; transition: opacity .15s; white-space: nowrap; z-index: 2;
+      display: flex; align-items: center; gap: 4px; text-decoration: none;
+    }
+    .chip:hover .chip-share { opacity: 1; }
+    .chip-share:hover { background: #5a5a7a; }
+    .chip-cal {
+      position: absolute; bottom: 8px; left: 8px;
+      background: var(--c-civicclerk); color: #fff; border: none; border-radius: 12px;
+      font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer;
+      opacity: 0; transition: opacity .15s; white-space: nowrap; z-index: 2;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .chip:hover .chip-cal { opacity: 1; }
+    .chip-cal:hover { background: #0a5c60; }
+    .chip-snooze {
+      position: absolute; top: 8px; left: 8px;
+      background: #5c4a8a; color: #fff; border: none; border-radius: 12px;
+      font-size: 11px; font-weight: 700; padding: 2px 7px; cursor: pointer;
+      opacity: 0; transition: opacity .15s; white-space: nowrap; z-index: 2;
+    }
+    .chip:hover .chip-snooze { opacity: 1; }
+    .chip-snooze:hover { background: #3d2f6a; }
+
+    /* ── Calendar panel ───────────────────────────────── */
+    .cal-btn {
+      background: none; border: none; cursor: pointer; padding: 0;
+      color: var(--accent); border-radius: 6px; display: flex; align-items: center;
+      transition: background .12s, color .12s; flex-shrink: 0;
+    }
+    .cal-btn:hover { opacity: .8; }
+    .cal-btn.active { opacity: .7; }
+    #cal-panel {
+      position: absolute; top: var(--header-h); right: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow-lg);
+      width: 264px; z-index: 100; display: none;
+    }
+    #cal-panel.open { display: block; }
+    .cal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px 6px;
+      font-size: 13px; font-weight: 600; color: var(--text);
+    }
+    .cal-nav { background: none; border: none; cursor: pointer; color: var(--text-2);
+      font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+    .cal-nav:hover { background: var(--surface-2); color: var(--text); }
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 1px; padding: 0 8px 6px; font-size: 11px;
+    }
+    .cal-day-name { text-align: center; color: var(--text-3); padding: 2px 0 4px; font-size: 10px; }
+    .cal-day {
+      text-align: center; padding: 3px 2px; border-radius: 4px;
+      cursor: default; position: relative; color: var(--text-2);
+    }
+    .cal-day.today { background: var(--accent); color: #000; font-weight: 700; }
+    .cal-day.has-event { color: var(--text); cursor: pointer; }
+    .cal-day.has-event:hover { background: var(--surface-2); }
+    .cal-day .event-dot {
+      position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+    .cal-day .event-dot.dot-green { background: #16a34a; }
+    .cal-day .event-dot.dot-red   { background: #dc2626; }
+    .cal-schedule {
+      border-top: 1px solid var(--border);
+      padding: 8px 12px 10px; max-height: 180px; overflow-y: auto;
+    }
+    .cal-schedule-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-3); margin-bottom: 6px;
+    }
+    .cal-event {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 4px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; text-decoration: none;
+    }
+    .cal-event:last-child { border-bottom: none; }
+    .cal-event:hover .cal-event-title { color: var(--accent); }
+    .cal-event-date { font-size: 11px; white-space: nowrap; flex-shrink: 0; font-weight: 700; }
+    .cal-event-date.date-green { color: #16a34a; }
+    .cal-event-date.date-red   { color: #dc2626; }
+    .cal-event-title { font-size: 12px; color: var(--text); line-height: 1.3; }
+    .cal-event-time  { font-size: 11px; color: var(--text-2); }
+    .cal-event-agenda-yes { font-size: 11px; color: #16a34a; font-weight: 700; }
+    .cal-event-agenda-no  { font-size: 11px; color: #dc2626; font-weight: 700; }
+    .cal-unsnooze {
+      font-size: 11px; color: #fff; font-weight: 600; background: #5c4a8a;
+      border: none; border-radius: 10px; padding: 1px 7px; cursor: pointer;
+      vertical-align: middle; white-space: nowrap;
+    }
+    .cal-unsnooze:hover { background: #3d2f6a; }
+    #toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: #323232; color: #fff; padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; pointer-events: none;
+      opacity: 0; transition: opacity .2s; z-index: 9999; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    .chip-accent { height: 4px; flex-shrink: 0; }
+    [data-source="DuckDuckGo"]        .chip-accent { background: var(--c-ddg); }
+    [data-source="DuckDuckGo Images"] .chip-accent { background: var(--c-ddg-images); }
+    [data-source="Bing"]              .chip-accent { background: var(--c-bing); }
+    [data-source="Bing News"]         .chip-accent { background: var(--c-bing-news); }
+    [data-source="KannapolisNC"]      .chip-accent { background: var(--c-kannapolis); }
+    [data-source="Google Alerts"]     .chip-accent { background: var(--c-google-alerts); }
+    [data-source="Google News"]       .chip-accent { background: var(--c-google-news); }
+    [data-source="Facebook"]          .chip-accent { background: var(--c-facebook); }
+    [data-source="Instagram"]         .chip-accent { background: var(--c-instagram); }
+    [data-source="YouTube"]            .chip-accent { background: var(--c-youtube); }
+    [data-source="CivicClerk"]         .chip-accent { background: var(--c-civicclerk); }
+    [data-source="PublicNotices"]      .chip-accent { background: var(--c-publicnotices); }
+    [data-source="NCDMV"]              .chip-accent { background: var(--c-ncdmv); }
+    [data-source="CharlotteObserver"]      .chip-accent { background: var(--c-charlotte-observer); }
+    [data-source="CabarrusCommissioners"] .chip-accent { background: var(--c-cabarrus-commissioners); }
+    [data-source="ConcordLakeLevels"]     .chip-accent { background: var(--c-concord-lake-levels); }
+
+    .chip-thumb {
+      width: 100%;
+      height: 148px;
+      overflow: hidden;
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+    .chip-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform .3s;
+    }
+    .chip:hover .chip-thumb img { transform: scale(1.04); }
+
+    .chip-body {
+      padding: 10px 13px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+    }
+
+    .chip-meta {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .chip-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--c-all);  /* fallback for unknown/legacy sources */
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    [data-source="DuckDuckGo"]        .chip-badge { background: var(--c-ddg); }
+    [data-source="DuckDuckGo Images"] .chip-badge { background: var(--c-ddg-images); }
+    [data-source="Bing"]              .chip-badge { background: var(--c-bing); }
+    [data-source="Bing News"]         .chip-badge { background: var(--c-bing-news); }
+    [data-source="KannapolisNC"]      .chip-badge { background: var(--c-kannapolis); }
+    [data-source="Google Alerts"]     .chip-badge { background: var(--c-google-alerts); }
+    [data-source="Google News"]       .chip-badge { background: var(--c-google-news); }
+    [data-source="Facebook"]          .chip-badge { background: var(--c-facebook); }
+    [data-source="Instagram"]         .chip-badge { background: var(--c-instagram); }
+    [data-source="YouTube"]            .chip-badge { background: var(--c-youtube); }
+    [data-source="CivicClerk"]         .chip-badge { background: var(--c-civicclerk); }
+    [data-source="PublicNotices"]      .chip-badge { background: var(--c-publicnotices); }
+    [data-source="NCDMV"]              .chip-badge { background: var(--c-ncdmv); }
+    [data-source="CharlotteObserver"]      .chip-badge { background: var(--c-charlotte-observer); }
+    [data-source="CabarrusCommissioners"] .chip-badge { background: var(--c-cabarrus-commissioners); }
+    [data-source="ConcordLakeLevels"]     .chip-badge { background: var(--c-concord-lake-levels); }
+
+    .chip-domain {
+      font-size: 11.5px;
+      color: var(--text-3);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chip-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .chip-snippet {
+      font-size: 12.5px;
+      color: var(--text-2);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .chip-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 3px;
+    }
+    .chip-date {
+      font-size: 13px;
+      color: var(--text-2);
+    }
+
+    /* ── View toggle ─────────────────────────────────── */
+    .view-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .view-btn {
+      padding: 7px 10px;
+      border: none;
+      background: var(--surface);
+      cursor: pointer;
+      color: var(--text-3);
+      display: flex;
+      align-items: center;
+      transition: background .1s, color .1s;
+    }
+    .view-btn:hover { background: var(--bg); color: var(--text-2); }
+    .view-btn.active { background: rgba(232,136,160,.12); color: var(--accent); }
+
+    /* ── List view ────────────────────────────────────── */
+    .chip-list { display: flex; flex-direction: column; gap: 3px; }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 48px 9px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      transition: background .1s;
+      min-width: 0;
+    }
+    .list-item:hover { background: var(--bg); }
+    .list-item:hover .chip-dismiss { opacity: 1; }
+
+    .list-title {
+      flex: 1;
+      font-size: 13.5px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+
+    /* ── States ───────────────────────────────────────── */
+    .state-msg {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-2);
+    }
+    .state-msg p { font-size: 15px; }
+    .state-msg small { font-size: 13px; color: var(--text-3); }
+    @keyframes zzz-rise {
+      0%   { opacity: 0; transform: translateY(0px);   }
+      20%  { opacity: 1; }
+      80%  { opacity: 0.75; }
+      100% { opacity: 0; transform: translateY(-28px); }
+    }
+    .zzz   { animation: zzz-rise 2.8s ease-in-out infinite; }
+    .zzz-b { animation-delay: 0.93s; }
+    .zzz-c { animation-delay: 1.86s; }
+
+    .hidden { display: none !important; }
+
+    mark {
+      background: rgba(251, 191, 36, .28);
+      color: #f5e090;
+      border-radius: 2px;
+      padding: 0 1px;
+      font-weight: 600;
+    }
+
+    /* ── Scrollbar (webkit) ───────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333348; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4a4a68; }
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<header class="header">
+  <svg viewBox="0 0 44 50" width="53" height="60" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0" aria-label="Tuxedo cat mascot">
+    <defs>
+      <clipPath id="eye-clip-l"><circle cx="15" cy="21" r="5.5"/></clipPath>
+      <clipPath id="eye-clip-r"><circle cx="29" cy="21" r="5.5"/></clipPath>
+    </defs>
+    <!-- ears -->
+    <polygon points="8,16 3,1 16,12"  fill="#1a1a1a"/>
+    <polygon points="36,16 41,1 28,12" fill="#1a1a1a"/>
+    <polygon points="9,14 5,5 14,12"  fill="#f0a0b0"/>
+    <polygon points="35,14 39,5 30,12" fill="#f0a0b0"/>
+    <!-- head -->
+    <circle cx="22" cy="23" r="17" fill="#1a1a1a"/>
+    <!-- white chin/muzzle patch -->
+    <ellipse cx="22" cy="30" rx="9" ry="7" fill="white"/>
+    <!-- eyes — large and round for a kitten -->
+    <circle cx="15" cy="21" r="5.5" fill="white"/>
+    <circle cx="15" cy="21" r="4"   fill="#0d0d1e"/>
+    <circle cx="16.5" cy="19.5" r="1.3" fill="white"/>
+    <circle cx="29" cy="21" r="5.5" fill="white"/>
+    <circle cx="29" cy="21" r="4"   fill="#0d0d1e"/>
+    <circle cx="30.5" cy="19.5" r="1.3" fill="white"/>
+    <!-- eyelids (animated by JS) -->
+    <rect id="cat-lid-l" class="cat-lid" x="9.5" y="15.5" width="11" height="11" fill="#1a1a1a" clip-path="url(#eye-clip-l)"/>
+    <rect id="cat-lid-r" class="cat-lid" x="23.5" y="15.5" width="11" height="11" fill="#1a1a1a" clip-path="url(#eye-clip-r)"/>
+    <!-- nose -->
+    <polygon points="22,27.5 20.5,29.5 23.5,29.5" fill="#e888a0"/>
+    <!-- mouth -->
+    <path id="cat-mouth"       d="M20.5,29.5 Q22,31.5 23.5,29.5" fill="none" stroke="#bbb" stroke-width="0.9"/>
+    <path id="cat-mouth-smile" d="M16.5,29.5 Q22,37 27.5,29.5"    fill="none" stroke="#bbb" stroke-width="0.9" style="opacity:0"/>
+    <!-- whiskers -->
+    <line x1="1"  y1="28"   x2="14" y2="29"   stroke="white" stroke-width="0.85"/>
+    <line x1="1"  y1="30.5" x2="14" y2="30.5" stroke="white" stroke-width="0.85"/>
+    <line x1="30" y1="29"   x2="43" y2="28"   stroke="white" stroke-width="0.85"/>
+    <line x1="30" y1="30.5" x2="43" y2="30.5" stroke="white" stroke-width="0.85"/>
+    <!-- body -->
+    <ellipse cx="22" cy="46" rx="13" ry="6"   fill="#1a1a1a"/>
+    <!-- white chest bib -->
+    <ellipse cx="22" cy="44" rx="7.5" ry="5"  fill="white"/>
+    <!-- white front paw -->
+    <ellipse cx="16" cy="49" rx="4.5" ry="2.5" fill="white"/>
+  </svg>
+  <div class="header-brand">K<em>CAT</em></div>
+  <div class="header-meta" id="header-meta"></div>
+  <div class="header-spacer"></div>
+  <div class="widgets">
+    <div class="widget-weather-cur">
+      <div class="weather-row1">
+        <span class="weather-icon" id="weather-icon">·</span>
+        <span class="weather-temp" id="weather-temp">--°F</span>
+      </div>
+      <div class="weather-desc" id="weather-desc">Kannapolis, NC</div>
+    </div>
+    <svg id="analog-clock" viewBox="0 0 48 48" width="42" height="42" style="flex-shrink:0" aria-label="Analog clock">
+      <circle cx="24" cy="24" r="23" fill="white" stroke="#ccc" stroke-width="0.5"/>
+      <!-- tick marks inserted by JS -->
+      <line id="clock-hour" x1="24" y1="24" x2="24" y2="11" stroke="#1a1a1a" stroke-width="2.8" stroke-linecap="round"/>
+      <line id="clock-min"  x1="24" y1="24" x2="24" y2="5"  stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round"/>
+      <line id="clock-sec"  x1="24" y1="30" x2="24" y2="4"  stroke="#e888a0" stroke-width="1"   stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="2.2" fill="#1a1a1a"/>
+      <circle cx="24" cy="24" r="1.1" fill="#e888a0"/>
+    </svg>
+    <button class="cal-btn" id="cal-toggle-btn" title="Meeting calendar">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div id="cal-panel">
+  <div class="cal-header">
+    <button class="cal-nav" id="cal-prev">&#8249;</button>
+    <span id="cal-month-label"></span>
+    <button class="cal-nav" id="cal-next">&#8250;</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-schedule">
+    <div class="cal-schedule-title">Upcoming Meetings</div>
+    <div id="cal-schedule-list"></div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">Sources</div>
+      <div id="source-nav"></div>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div class="nav-section">
+      <div class="nav-label">Queries</div>
+      <div id="query-nav"></div>
+    </div>
+
+  </nav>
+
+  <main class="content">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="search-input" type="search" placeholder="Filter results…" autocomplete="off">
+      </div>
+      <span class="count-label" id="count-label"></span>
+      <button class="btn" id="btn-mark-read">Mark all as read</button>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-view-chip" title="Card view">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="9" y="1" width="5" height="5" rx="1"/><rect x="1" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+        </button>
+        <button class="view-btn" id="btn-view-list" title="List view">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="1" y="2" width="13" height="2" rx="1"/><rect x="1" y="6.5" width="13" height="2" rx="1"/><rect x="1" y="11" width="13" height="2" rx="1"/></svg>
+        </button>
+      </div>
+      <button class="btn" id="btn-show-blocked" title="Show blocked items" style="display:none;">Show blocked</button>
+    </div>
+
+    <div class="chip-grid" id="chip-grid">
+      <div class="state-msg"><p>Loading…</p></div>
+    </div>
+  </main>
+
+</div>
+
+<!-- KSPIDER_DATA -->
+<script>
+  "use strict";
+
+  // ── State ────────────────────────────────────────────
+  let all = [];
+  let cachedStats = null;
+  const state = { source: null, query: null, text: "", view: "chip" };
+  let dismissed = new Set();
+
+  // Normalize a URL so that the same article with different tracking params or
+  // MSN category-path variants all map to one canonical key for block matching.
+  function normalizeUrl(url) {
+    try {
+      let u = new URL(url);
+      // Decode Bing click-tracking redirects (bing.com/ck/a?...&u=a1<base64>...).
+      // The p=/hsh=/fclid= params are session-unique; decode to the real destination.
+      if ((u.hostname === 'www.bing.com' || u.hostname === 'bing.com') && u.pathname.startsWith('/ck/')) {
+        const encoded = u.searchParams.get('u') || '';
+        if (encoded.startsWith('a1')) {
+          try {
+            const b64 = encoded.slice(2).replace(/-/g, '+').replace(/_/g, '/');
+            const padded = b64 + '==='.slice((b64.length + 3) % 4 || 3);
+            const decoded = atob(padded);
+            if (decoded.startsWith('http')) { u = new URL(decoded); }
+          } catch {}
+        }
+      }
+      // MSN serves the same article under multiple category paths; use article ID only.
+      if (u.hostname === 'www.msn.com' || u.hostname === 'msn.com') {
+        const parts = u.pathname.split('/').filter(Boolean);
+        for (let i = parts.length - 1; i >= 0; i--) {
+          if (/^(ar|vi|bb)-[A-Za-z0-9]+$/.test(parts[i])) {
+            return 'https://www.msn.com/' + parts[i];
+          }
+        }
+      }
+      // Strip common tracking / session query params that change between crawl runs.
+      ['utm_source','utm_medium','utm_campaign','utm_content','utm_term',
+       'fbclid','gclid','msclkid','ocid','ref','ceid','form','mkt','msockid'].forEach(k => u.searchParams.delete(k));
+      u.hash = '';
+      return u.toString();
+    } catch { return url; }
+  }
+
+  function loadDismissed() {
+    try { dismissed = new Set(JSON.parse(localStorage.getItem("kspider_dismissed") || "[]").map(normalizeUrl)); }
+    catch { dismissed = new Set(); }
+    // Migrate legacy kspider_blocked into dismissed
+    try {
+      const legacy = JSON.parse(localStorage.getItem("kspider_blocked") || "[]");
+      if (legacy.length) {
+        legacy.forEach(u => dismissed.add(normalizeUrl(u)));
+        localStorage.removeItem("kspider_blocked");
+        saveDismissed();
+      }
+    } catch {}
+  }
+  function saveDismissed() {
+    try { localStorage.setItem("kspider_dismissed", JSON.stringify([...dismissed])); } catch {}
+  }
+
+  function blockUrl(url) {
+    dismissed.add(normalizeUrl(url));
+    saveDismissed();
+    render();
+  }
+
+  const MTG_SOURCES = new Set(["CivicClerk", "CabarrusCommissioners"]);
+  let snoozed = new Set();
+  function loadSnoozed() {
+    try { snoozed = new Set(JSON.parse(localStorage.getItem("kspider_snoozed") || "[]").map(normalizeUrl)); }
+    catch { snoozed = new Set(); }
+  }
+  function saveSnoozed() {
+    try { localStorage.setItem("kspider_snoozed", JSON.stringify([...snoozed])); } catch {}
+  }
+  function snoozeUrl(url) {
+    snoozed.add(normalizeUrl(url));
+    saveSnoozed();
+    render();
+  }
+  function unsnoozeUrl(url) {
+    snoozed.delete(normalizeUrl(url));
+    saveSnoozed();
+    render();
+    if (calOpen) renderCalendar();
+  }
+  function autoWakeSnoozed() {
+    let woke = 0;
+    all.forEach(r => {
+      const nu = normalizeUrl(r.url);
+      if (!MTG_SOURCES.has(r.source) || !snoozed.has(nu)) return;
+      if (agendaPosted(r)) {
+        snoozed.delete(nu);
+        woke++;
+      }
+    });
+    if (woke) {
+      saveSnoozed();
+      showToast(`${woke} snoozed meeting${woke > 1 ? "s" : ""} woke up — agenda posted!`);
+    }
+  }
+
+  const SOURCE_COLORS = {
+    "CivicClerk":        "#0d7377",
+    "KannapolisNC":      "#003087",
+    "PublicNotices":     "#6a1e6e",
+    "CabarrusCompass":     "#c2410c",
+    "IndependentTribune":  "#1e6b3c",
+    "SalisburyPost":       "#8b1a1a",
+    "CharlotteObserver":      "#7b1313",
+    "CabarrusCommissioners":  "#1a4a2e",
+    "ConcordLakeLevels":      "#0e6494",
+    "NCDMV":             "#c8102e",
+    "DuckDuckGo":        "#de5833",
+    "DuckDuckGo Images": "#16a34a",
+    "Bing":              "#008272",
+    "Bing News":         "#005da6",
+    "Google Alerts":     "#fbbc04",
+    "Google News":       "#1a73e8",
+    "Facebook":          "#1877f2",
+    "Instagram":         "#e1306c",
+    "YouTube":           "#ff0000",
+  };
+  const SOURCE_LABELS = {
+    "CivicClerk":        "CivicClerk",
+    "KannapolisNC":      "City of Kannapolis",
+    "PublicNotices":     "Public Notices",
+    "CabarrusCompass":     "Cabarrus Compass",
+    "IndependentTribune":  "Independent Tribune",
+    "SalisburyPost":       "Salisbury Post",
+    "CharlotteObserver":     "Charlotte Observer",
+    "CabarrusCommissioners": "Cabarrus Commissioners",
+    "ConcordLakeLevels":     "Concord Lake Levels",
+    "NCDMV":             "NCDOT Incidents",
+    "DuckDuckGo":        "DDG",
+    "DuckDuckGo Images": "DDG Images",
+    "Bing":              "Bing",
+    "Bing News":         "Bing News",
+    "Google Alerts":     "Google Alerts",
+    "Google News":       "Google News",
+    "Facebook":          "Facebook",
+    "Instagram":         "Instagram",
+    "YouTube":           "YouTube",
+  };
+
+  // ── Calendar ─────────────────────────────────────────
+  let calMonth = new Date(); calMonth.setDate(1);
+  let calOpen = false;
+
+  function civicMeetings() {
+    return all.filter(r => MTG_SOURCES.has(r.source) && r.published_at)
+              .sort((a, b) => new Date(a.published_at) - new Date(b.published_at));
+  }
+
+  function agendaPosted(m) {
+    return (m.snippet || "").toLowerCase().includes("agenda posted");
+  }
+
+  function renderCalendar() {
+    const meetings = civicMeetings();
+    const now = new Date();
+    const y = calMonth.getFullYear(), mo = calMonth.getMonth();
+    const label = calMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    document.getElementById("cal-month-label").textContent = label;
+
+    // Build map of day → agenda status (green if ALL have agenda, else red)
+    const meetDayStatus = {};
+    meetings.forEach(m => {
+      const day = m.published_at.replace(/Z$/, "").slice(0, 10);
+      const posted = agendaPosted(m);
+      if (!(day in meetDayStatus)) meetDayStatus[day] = posted;
+      else meetDayStatus[day] = meetDayStatus[day] && posted;
+    });
+    const meetDays = new Set(Object.keys(meetDayStatus));
+
+    // Build month grid
+    const firstDow = new Date(y, mo, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(y, mo + 1, 0).getDate();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+
+    let html = ["Su","Mo","Tu","We","Th","Fr","Sa"]
+      .map(d => `<div class="cal-day-name">${d}</div>`).join("");
+    for (let i = 0; i < firstDow; i++) html += `<div></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${y}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      const isToday = ds === todayStr;
+      const hasMtg = meetDays.has(ds);
+      const dotColor = hasMtg ? (meetDayStatus[ds] ? "dot-green" : "dot-red") : "";
+      const dot = hasMtg ? `<span class="event-dot ${dotColor}"></span>` : "";
+      const cls = ["cal-day", isToday ? "today" : "", hasMtg ? "has-event" : ""].filter(Boolean).join(" ");
+      const attr = hasMtg ? `data-cal-day="${ds}"` : "";
+      html += `<div class="${cls}" ${attr}>${d}${dot}</div>`;
+    }
+    document.getElementById("cal-grid").innerHTML = html;
+
+    // Schedule list — upcoming only
+    const upcomingStr = todayStr;
+    const upcoming = meetings.filter(m => m.published_at.replace(/Z$/, "").slice(0, 10) >= upcomingStr);
+    const monthUpcoming = meetings.filter(m => {
+      const ms = m.published_at.replace(/Z$/, "").slice(0, 7);
+      return ms === `${y}-${String(mo+1).padStart(2,"0")}`;
+    });
+    const toShow = upcoming.length ? upcoming : monthUpcoming;
+
+    const schedHtml = toShow.map(m => {
+      const dt = new Date(m.published_at.replace(/Z$/, ""));
+      const dateStr = dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      const posted = agendaPosted(m);
+      const isSnoozed = snoozed.has(normalizeUrl(m.url));
+      const dateClass = posted ? "date-green" : "date-red";
+      const agendaLabel = posted
+        ? `<span class="cal-event-agenda-yes">Agenda posted</span>`
+        : `<span class="cal-event-agenda-no">No agenda</span>`;
+      const snoozeTag = isSnoozed
+        ? `<button class="cal-unsnooze" data-url="${esc(m.url)}" title="Click to wake this chip">💤 Snoozed</button>`
+        : "";
+      return `<a class="cal-event" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">
+        <span class="cal-event-date ${dateClass}">${esc(dateStr)}</span>
+        <span class="cal-event-title">${esc(m.title)}<br>
+          <span class="cal-event-time">${esc(timeStr)}</span> · ${agendaLabel}${snoozeTag ? " · " + snoozeTag : ""}
+        </span>
+      </a>`;
+    }).join("");
+    document.getElementById("cal-schedule-list").innerHTML =
+      schedHtml || `<div style="color:var(--text-3);font-size:12px">No meetings this month</div>`;
+
+    // Day-click scrolls to chip
+    document.querySelectorAll(".cal-day.has-event").forEach(el => {
+      el.addEventListener("click", () => {
+        const day = el.dataset.calDay;
+        const chip = document.querySelector(`.chip[data-source="CivicClerk"]`);
+        if (chip) chip.scrollIntoView({ behavior: "smooth", block: "center" });
+        calOpen = false;
+        document.getElementById("cal-panel").classList.remove("open");
+        document.getElementById("cal-toggle-btn").classList.remove("active");
+      });
+    });
+  }
+
+  function toggleCalendar() {
+    calOpen = !calOpen;
+    document.getElementById("cal-panel").classList.toggle("open", calOpen);
+    document.getElementById("cal-toggle-btn").classList.toggle("active", calOpen);
+    if (calOpen) renderCalendar();
+  }
+
+  function downloadIcs(title, dateStr, url) {
+    const dt = new Date(dateStr);
+    const fmt = d => d.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
+    const end = new Date(dt.getTime() + 2 * 3600000);
+    const ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//KCAT//EN",
+      "BEGIN:VEVENT",
+      "DTSTART:" + fmt(dt),
+      "DTEND:" + fmt(end),
+      "SUMMARY:" + title.replace(/,/g, "\\,"),
+      "URL:" + url,
+      "DESCRIPTION:" + url,
+      "END:VEVENT", "END:VCALENDAR"
+    ].join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = title.replace(/[^a-z0-9]/gi, "_").toLowerCase().slice(0, 40) + ".ics";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("Calendar event downloaded!");
+  }
+
+  // ── Helpers ──────────────────────────────────────────
+  let _toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ── Text helpers ─────────────────────────────────────
+  function stripHtml(s) {
+    if (!s) return "";
+    const el = document.createElement("div");
+    el.innerHTML = s;
+    return el.textContent || el.innerText || "";
+  }
+
+  // ── Keyword highlighting ─────────────────────────────
+  function termRegex(query) {
+    const words = (query || "").split(/[\s,]+/).filter(t => t.length >= 3);
+    if (!words.length) return null;
+    const pattern = words.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    return new RegExp(`(${pattern})`, "gi");
+  }
+
+  // Return a ~200-char window of text centred on the first keyword hit.
+  function excerpt(text, query) {
+    if (!text) return "";
+    const re = termRegex(query);
+    const match = re && re.exec(text);
+    if (!match) return text.slice(0, 200) + (text.length > 200 ? "…" : "");
+    const start = Math.max(0, match.index - 80);
+    const end   = Math.min(text.length, match.index + 120);
+    return (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : "");
+  }
+
+  // Wrap keyword hits in <mark>. Operates on plain text; escapes everything else.
+  function highlight(text, query) {
+    if (!text) return "";
+    const re = termRegex(query);
+    if (!re) return esc(text);
+    return text.split(re).map((part, i) =>
+      i % 2 === 1 ? `<mark>${esc(part)}</mark>` : esc(part)
+    ).join("");
+  }
+
+  function chipDate(r) {
+    return r.published_at ? relTime(r.published_at) : "";
+  }
+
+  // Bare ISO datetimes (no Z / offset) are ambiguous — JS treats them as local
+  // time, which shifts the date for users west of UTC. Force UTC interpretation.
+  function toDate(s) {
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) s += "Z";
+    return new Date(s);
+  }
+
+  function formatDate(s) {
+    if (!s) return "";
+    try {
+      return toDate(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return String(s).slice(0, 10); }
+  }
+
+  function relTime(s) {
+    if (!s) return "";
+    const diff = (Date.now() - toDate(s).getTime()) / 1000;
+    if (diff < 60)   return "just now";
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
+
+  // ── Data loading ─────────────────────────────────────
+  function loadData() {
+    if (window.__DATA__) {
+      ingestData(window.__DATA__);
+    } else {
+      document.getElementById("chip-grid").innerHTML =
+        `<div class="state-msg"><p>No data.</p><small>Run: kspider export</small></div>`;
+    }
+  }
+
+  function ingestData(data) {
+    window._lastData = data;
+    const seen = new Set();
+    all = data.results.filter(r => { const n = normalizeUrl(r.url); if (seen.has(n)) return false; seen.add(n); return true; });
+    cachedStats = data.stats;
+
+    // Recompute counts from visible (non-dismissed) items
+    const visibleAll = all.filter(r => !dismissed.has(normalizeUrl(r.url)));
+    cachedStats = Object.assign({}, data.stats, {
+      total: visibleAll.length,
+      by_source: visibleAll.reduce((acc, r) => { acc[r.source] = (acc[r.source] || 0) + 1; return acc; }, {}),
+      by_query:  visibleAll.reduce((acc, r) => { acc[r.query]  = (acc[r.query]  || 0) + 1; return acc; }, {}),
+    });
+
+    const run = data.runs && data.runs[0];
+    restoreState();
+    document.getElementById("header-meta").textContent = run
+      ? `Last run ${relTime(run.ran_at)} · ${visibleAll.length.toLocaleString()} results`
+      : "No runs yet — try: kspider search";
+    autoWakeSnoozed();
+    renderSidebar();
+    render();
+    if (calOpen) renderCalendar();
+  }
+
+  let showBlocked = false;
+
+  // ── Render chips ─────────────────────────────────────
+  function visibleItems() {
+    // Text search spans everything including dismissed; otherwise respect show/hide state
+    let items = state.text
+      ? all.filter(r => !snoozed.has(normalizeUrl(r.url)))
+      : showBlocked
+        ? all.filter(r => dismissed.has(normalizeUrl(r.url)))
+        : all.filter(r => !dismissed.has(normalizeUrl(r.url)) && !snoozed.has(normalizeUrl(r.url)));
+    if (state.source) items = items.filter(r => r.source === state.source);
+    if (state.query)  items = items.filter(r => r.query  === state.query);
+    if (state.text) {
+      const t = state.text.toLowerCase();
+      items = items.filter(r =>
+        (r.title         || "").toLowerCase().includes(t) ||
+        (r.snippet       || "").toLowerCase().includes(t) ||
+        (r.source_domain || "").toLowerCase().includes(t)
+      );
+    }
+    return items;
+  }
+
+  function markAllRead() {
+    visibleItems().forEach(r => dismissed.add(normalizeUrl(r.url)));
+    saveDismissed();
+    render();
+  }
+
+  function listHtml(r) {
+    const label = SOURCE_LABELS[r.source] || r.source;
+    const terms = r.query || state.text;
+    const dateLabel = chipDate(r);
+    const date = dateLabel ? `<span class="chip-date">${esc(dateLabel)}</span>` : "";
+    const isBlocked = dismissed.has(normalizeUrl(r.url));
+    const action = isBlocked
+      ? `<button class="chip-unblock" data-unblock-url="${esc(r.url)}">Unblock</button>`
+      : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
+    return `<a class="list-item${isBlocked ? ' is-blocked' : ''}" data-source="${esc(r.source)}"
+               href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"
+               title="${esc(r.title)}">
+      <span class="chip-badge">${esc(label)}</span>
+      <span class="list-title">${highlight(r.title || "(no title)", terms)}</span>
+      <span class="chip-domain">${esc(r.source_domain || "")}</span>
+      ${date}
+      ${action}
+    </a>`;
+  }
+
+  function render() {
+    const items = visibleItems();
+    items.sort((a, b) => {
+      const aIsMtg = MTG_SOURCES.has(a.source);
+      const bIsMtg = MTG_SOURCES.has(b.source);
+      // Meeting sources bubble to top, sorted ascending (next meeting first)
+      if (aIsMtg && !bIsMtg) return -1;
+      if (!aIsMtg && bIsMtg) return 1;
+      if (aIsMtg && bIsMtg) {
+        return new Date(a.published_at || 0) - new Date(b.published_at || 0);
+      }
+      return new Date(b.published_at || b.fetched_at || 0) - new Date(a.published_at || a.fetched_at || 0);
+    });
+
+    const grid = document.getElementById("chip-grid");
+    grid.className = state.view === "list" ? "chip-list" : "chip-grid";
+
+    if (items.length === 0) {
+      grid.innerHTML = `<div class="state-msg">
+        <svg viewBox="0 0 160 92" width="200" height="115" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 12px" aria-hidden="true">
+          <!-- floating z's -->
+          <text class="zzz"         x="124" y="27" font-size="11" font-weight="700" font-family="sans-serif" fill="#e888a0" opacity="0">z</text>
+          <text class="zzz zzz-b"   x="132" y="16" font-size="15" font-weight="700" font-family="sans-serif" fill="#e888a0" opacity="0">z</text>
+          <text class="zzz zzz-c"   x="141" y="5"  font-size="20" font-weight="700" font-family="sans-serif" fill="#e888a0" opacity="0">Z</text>
+          <!-- tail curling from left of body -->
+          <path d="M22,60 C4,54 1,40 15,36 C26,32 30,45 20,51" fill="none" stroke="#1a1a1a" stroke-width="9" stroke-linecap="round"/>
+          <!-- body (horizontal) -->
+          <ellipse cx="70" cy="63" rx="50" ry="17" fill="#1a1a1a"/>
+          <!-- white belly -->
+          <ellipse cx="70" cy="68" rx="35" ry="10" fill="white"/>
+          <!-- left ear -->
+          <polygon points="93,30 87,9 104,23"  fill="#1a1a1a"/>
+          <polygon points="94,28 90,13 102,23" fill="#f0a0b0"/>
+          <!-- right ear -->
+          <polygon points="118,27 124,7 109,21"  fill="#1a1a1a"/>
+          <polygon points="117,26 122,11 111,22" fill="#f0a0b0"/>
+          <!-- head -->
+          <circle cx="109" cy="47" r="22" fill="#1a1a1a"/>
+          <!-- white muzzle -->
+          <ellipse cx="109" cy="55" rx="12" ry="10" fill="white"/>
+          <!-- closed eyes — upward arcs = sleeping -->
+          <path d="M97,44 Q103,38 109,44" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round"/>
+          <path d="M109,44 Q115,38 121,44" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round"/>
+          <!-- nose -->
+          <polygon points="109,52 107.5,54 110.5,54" fill="#e888a0"/>
+          <!-- contented small smile -->
+          <path d="M107.5,54 Q109,56.5 110.5,54" fill="none" stroke="#bbb" stroke-width="0.9"/>
+          <!-- whiskers -->
+          <line x1="82" y1="53" x2="96" y2="54" stroke="white" stroke-width="0.85"/>
+          <line x1="82" y1="56" x2="96" y2="56" stroke="white" stroke-width="0.85"/>
+          <line x1="122" y1="54" x2="136" y2="53" stroke="white" stroke-width="0.85"/>
+          <line x1="122" y1="56" x2="136" y2="56" stroke="white" stroke-width="0.85"/>
+          <!-- white chest bib -->
+          <ellipse cx="104" cy="63" rx="9" ry="7" fill="white"/>
+          <!-- front paws (tucked under head) -->
+          <ellipse cx="93"  cy="75" rx="16" ry="6.5" fill="#1a1a1a"/>
+          <ellipse cx="93"  cy="75" rx="13" ry="4.5" fill="white"/>
+          <ellipse cx="115" cy="77" rx="14" ry="6"   fill="#1a1a1a"/>
+          <ellipse cx="115" cy="77" rx="11" ry="4"   fill="white"/>
+        </svg>
+        <p>No results match your filters.</p>
+        <small>Try clearing the search or selecting a different source.</small>
+      </div>`;
+    } else {
+      grid.innerHTML = items.map(state.view === "list" ? listHtml : chipHtml).join("");
+    }
+
+    const n = items.length;
+    document.getElementById("count-label").textContent =
+      `${n.toLocaleString()} result${n !== 1 ? "s" : ""}`;
+    document.getElementById("btn-mark-read").style.display = n > 0 && !showBlocked ? "" : "none";
+
+    const btnBlocked = document.getElementById("btn-show-blocked");
+    const hiddenInView = all.filter(r =>
+      dismissed.has(normalizeUrl(r.url)) &&
+      (!state.source || r.source === state.source) &&
+      (!state.query  || r.query  === state.query)
+    ).length;
+    btnBlocked.style.display = (showBlocked || hiddenInView > 0) ? "" : "none";
+    btnBlocked.classList.toggle("btn-show-blocked-active", showBlocked);
+    btnBlocked.textContent = showBlocked ? "Hide blocked" : `Show blocked (${hiddenInView})`;
+
+    renderSidebar();
+  }
+
+  function chipHtml(r) {
+    const label = SOURCE_LABELS[r.source] || r.source;
+
+    const thumb = r.thumbnail_url
+      ? `<div class="chip-thumb">
+           <img src="${esc(r.thumbnail_url)}" loading="lazy"
+                onerror="this.closest('.chip-thumb').style.display='none'">
+         </div>`
+      : "";
+
+    const terms = r.query || state.text;
+    const snippetText = r.snippet ? excerpt(stripHtml(r.snippet), terms) : "";
+    const snippet = snippetText
+      ? `<div class="chip-snippet">${highlight(snippetText, terms)}</div>`
+      : "";
+
+    const dateLabel = chipDate(r);
+    const date = dateLabel
+      ? `<div class="chip-footer"><span class="chip-date">${esc(dateLabel)}</span></div>`
+      : "";
+
+    const isBlocked = dismissed.has(normalizeUrl(r.url));
+    const action = isBlocked
+      ? `<button class="chip-unblock" data-unblock-url="${esc(r.url)}">Unblock</button>`
+      : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
+    const share = `<button class="chip-share" data-share-url="${esc(r.url)}" title="Copy link to clipboard">Copy</button>`;
+    const snoozeBtn = MTG_SOURCES.has(r.source) && !agendaPosted(r) && !isBlocked
+      ? `<button class="chip-snooze" data-snooze-url="${esc(r.url)}" title="Snooze until agenda is posted">Zzz</button>`
+      : "";
+    const calBtn = "";
+    return `<a class="chip${isBlocked ? ' is-blocked' : ''}" data-source="${esc(r.source)}"
+               href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"
+               title="${esc(r.title)}">
+      ${action}
+      ${snoozeBtn}
+      ${share}
+      ${calBtn}
+      <div class="chip-accent"></div>
+      ${thumb}
+      <div class="chip-body">
+        <div class="chip-meta">
+          <span class="chip-badge">${esc(label)}</span>
+          <span class="chip-domain">${esc(r.source_domain || "")}</span>
+        </div>
+        <div class="chip-title">${highlight(r.title || "(no title)", terms)}</div>
+        ${snippet}
+        ${date}
+      </div>
+    </a>`;
+  }
+
+  // ── Render sidebar ────────────────────────────────────
+  function renderSidebar() {
+    if (!cachedStats) return;
+    const s = cachedStats;
+
+
+    // Sources
+    const srcDefs = [
+      { key: null,                  label: "All",                 color: "#9aa0a6",                             count: s.total },
+      { key: "Bing",                label: "Bing",                color: SOURCE_COLORS["Bing"],                 count: s.by_source["Bing"]                 || 0 },
+      { key: "Bing News",           label: "Bing News",           color: SOURCE_COLORS["Bing News"],            count: s.by_source["Bing News"]            || 0 },
+      { key: "CabarrusCompass",     label: "Cabarrus Compass",    color: SOURCE_COLORS["CabarrusCompass"],      count: s.by_source["CabarrusCompass"]      || 0 },
+      { key: "CharlotteObserver",      label: "Charlotte Observer",      color: SOURCE_COLORS["CharlotteObserver"],      count: s.by_source["CharlotteObserver"]     || 0 },
+      { key: "CabarrusCommissioners",  label: "Cabarrus Commissioners",  color: SOURCE_COLORS["CabarrusCommissioners"],  count: s.by_source["CabarrusCommissioners"] || 0 },
+      { key: "CivicClerk",          label: "CivicClerk",          color: SOURCE_COLORS["CivicClerk"],           count: s.by_source["CivicClerk"]           || 0 },
+      { key: "ConcordLakeLevels",   label: "Concord Lake Levels",    color: SOURCE_COLORS["ConcordLakeLevels"],     count: s.by_source["ConcordLakeLevels"]    || 0 },
+      { key: "KannapolisNC",        label: "City of Kannapolis",  color: SOURCE_COLORS["KannapolisNC"],         count: s.by_source["KannapolisNC"]         || 0 },
+      { key: "DuckDuckGo",          label: "DuckDuckGo",          color: SOURCE_COLORS["DuckDuckGo"],           count: s.by_source["DuckDuckGo"]           || 0 },
+      { key: "DuckDuckGo Images",   label: "DuckDuckGo Images",   color: SOURCE_COLORS["DuckDuckGo Images"],   count: s.by_source["DuckDuckGo Images"]    || 0 },
+      { key: "Facebook",            label: "Facebook",            color: SOURCE_COLORS["Facebook"],             count: s.by_source["Facebook"]             || 0 },
+      { key: "Google Alerts",       label: "Google Alerts",       color: SOURCE_COLORS["Google Alerts"],        count: s.by_source["Google Alerts"]        || 0 },
+      { key: "Google News",         label: "Google News",         color: SOURCE_COLORS["Google News"],          count: s.by_source["Google News"]          || 0 },
+      { key: "IndependentTribune",  label: "Independent Tribune", color: SOURCE_COLORS["IndependentTribune"],  count: s.by_source["IndependentTribune"]   || 0 },
+      { key: "Instagram",           label: "Instagram",           color: SOURCE_COLORS["Instagram"],            count: s.by_source["Instagram"]            || 0 },
+      { key: "NCDMV",               label: "NCDOT Incidents",     color: SOURCE_COLORS["NCDMV"],                count: s.by_source["NCDMV"]                || 0 },
+      { key: "PublicNotices",       label: "Public Notices",      color: SOURCE_COLORS["PublicNotices"],        count: s.by_source["PublicNotices"]        || 0 },
+      { key: "SalisburyPost",       label: "Salisbury Post",      color: SOURCE_COLORS["SalisburyPost"],        count: s.by_source["SalisburyPost"]        || 0 },
+      { key: "YouTube",             label: "YouTube",             color: SOURCE_COLORS["YouTube"],              count: s.by_source["YouTube"]              || 0 },
+    ];
+    document.getElementById("source-nav").innerHTML = srcDefs.map(d => navBtn(
+      state.source === d.key,
+      d.label, d.count, d.color,
+      `data-src="${d.key ?? ""}"`
+    )).join("");
+
+    // Queries
+    const queries = Object.entries(s.by_query);
+    const queryHtml = navBtn(state.query === null, "All queries", s.total, "#9aa0a6", 'data-qry=""') +
+      queries.map(([q, c]) => navBtn(state.query === q, q, c, "#9aa0a6", `data-qry="${esc(q)}"`)).join("");
+    document.getElementById("query-nav").innerHTML = queryHtml;
+  }
+
+  function navBtn(active, label, count, color, dataAttr) {
+    return `<button class="nav-btn ${active ? "active" : ""}" ${dataAttr}>
+      <span class="nav-dot" style="background:${color}"></span>
+      <span class="nav-text">${esc(label)}</span>
+      <span class="nav-count">${count.toLocaleString()}</span>
+    </button>`;
+  }
+
+  // ── localStorage state ───────────────────────────────
+  const LS_KEY = "kspider_state";
+
+  function saveState() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+  }
+
+  function restoreState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      state.source = saved.source || null;
+      state.query  = saved.query  || null;
+      state.text   = saved.text   || "";
+      state.view   = saved.view   || "chip";
+      document.getElementById("search-input").value = state.text;
+      document.getElementById("btn-view-chip").classList.toggle("active", state.view === "chip");
+      document.getElementById("btn-view-list").classList.toggle("active", state.view === "list");
+    } catch {}
+  }
+
+  // ── Events ───────────────────────────────────────────
+  document.getElementById("source-nav").addEventListener("click", e => {
+    const btn = e.target.closest(".nav-btn[data-src]");
+    if (!btn) return;
+    state.source = btn.dataset.src === "" ? null : btn.dataset.src;
+    saveState();
+    render();
+  });
+
+  document.getElementById("query-nav").addEventListener("click", e => {
+    const btn = e.target.closest(".nav-btn[data-qry]");
+    if (!btn) return;
+    state.query = btn.dataset.qry === "" ? null : btn.dataset.qry;
+    saveState();
+    render();
+  });
+
+  document.getElementById("search-input").addEventListener("input", e => {
+    state.text = e.target.value;
+    saveState();
+    render();
+  });
+
+  document.getElementById("btn-mark-read").addEventListener("click", markAllRead);
+
+  // ── Blocked modal ────────────────────────────────────
+  document.getElementById("btn-show-blocked").addEventListener("click", () => {
+    showBlocked = !showBlocked;
+    render();
+  });
+
+  document.getElementById("btn-view-chip").addEventListener("click", () => {
+    state.view = "chip";
+    document.getElementById("btn-view-chip").classList.add("active");
+    document.getElementById("btn-view-list").classList.remove("active");
+    saveState(); render();
+  });
+  document.getElementById("btn-view-list").addEventListener("click", () => {
+    state.view = "list";
+    document.getElementById("btn-view-list").classList.add("active");
+    document.getElementById("btn-view-chip").classList.remove("active");
+    saveState(); render();
+  });
+
+  document.getElementById("cal-toggle-btn").addEventListener("click", toggleCalendar);
+  document.getElementById("cal-prev").addEventListener("click", () => {
+    calMonth.setMonth(calMonth.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById("cal-next").addEventListener("click", () => {
+    calMonth.setMonth(calMonth.getMonth() + 1);
+    renderCalendar();
+  });
+  document.getElementById("cal-panel").addEventListener("click", e => {
+    const btn = e.target.closest(".cal-unsnooze");
+    if (btn) {
+      e.preventDefault(); e.stopPropagation();
+      unsnoozeUrl(btn.dataset.url);
+      showToast("Meeting woken — chip is back on the dashboard.");
+      return;
+    }
+  });
+
+  document.addEventListener("click", e => {
+    if (calOpen && !e.target.closest("#cal-panel") && !e.target.closest("#cal-toggle-btn")) {
+      calOpen = false;
+      document.getElementById("cal-panel").classList.remove("open");
+      document.getElementById("cal-toggle-btn").classList.remove("active");
+    }
+  });
+
+  document.getElementById("chip-grid").addEventListener("click", e => {
+    const snooze = e.target.closest(".chip-snooze");
+    if (snooze) {
+      e.preventDefault(); e.stopPropagation();
+      snoozeUrl(snooze.dataset.snoozeUrl);
+      showToast("Snoozed — will reappear when agenda is posted.");
+      return;
+    }
+    const cal = e.target.closest(".chip-cal");
+    if (cal) {
+      e.preventDefault(); e.stopPropagation();
+      downloadIcs(cal.dataset.calTitle, cal.dataset.calDate, cal.dataset.calUrl);
+      return;
+    }
+    const share = e.target.closest(".chip-share");
+    if (share) {
+      e.preventDefault(); e.stopPropagation();
+      navigator.clipboard.writeText(share.dataset.shareUrl).catch(() => {});
+      showToast("Link copied to clipboard!");
+      return;
+    }
+    const dismiss = e.target.closest(".chip-dismiss");
+    if (dismiss) {
+      e.preventDefault(); e.stopPropagation();
+      blockUrl(dismiss.dataset.dismissUrl);
+    }
+    const unblock = e.target.closest(".chip-unblock");
+    if (unblock) {
+      e.preventDefault(); e.stopPropagation();
+      const url = unblock.dataset.unblockUrl;
+      dismissed.delete(normalizeUrl(url));
+      saveDismissed();
+      const stillHidden = all.some(r => dismissed.has(normalizeUrl(r.url)) && (!state.source || r.source === state.source) && (!state.query || r.query === state.query));
+      if (!stillHidden) showBlocked = false;
+      render();
+    }
+  });
+
+  // ── Cat blink ─────────────────────────────────────────
+  (function initCatBlink() {
+    const lids   = document.querySelectorAll(".cat-lid");
+    const mouth  = document.getElementById("cat-mouth");
+    const smile  = document.getElementById("cat-mouth-smile");
+    function doBlink(onDone) {
+      lids.forEach(l => l.classList.add("closed"));
+      mouth.style.opacity = "0";
+      smile.style.opacity = "1";
+      setTimeout(() => {
+        lids.forEach(l => l.classList.remove("closed"));
+        mouth.style.opacity = "1";
+        smile.style.opacity = "0";
+        setTimeout(onDone, 200); // wait for open transition + tiny gap
+      }, 130);
+    }
+    function schedule() {
+      const delay = 2500 + Math.random() * 4500;
+      setTimeout(() => {
+        if (Math.random() < 0.2) {
+          // occasional double-blink
+          doBlink(() => setTimeout(() => doBlink(schedule), 110));
+        } else {
+          doBlink(schedule);
+        }
+      }, delay);
+    }
+    schedule();
+  })();
+
+  // ── Analog clock ─────────────────────────────────────
+  (function initClock() {
+    const svg = document.getElementById("analog-clock");
+    const ns  = "http://www.w3.org/2000/svg";
+    // Draw tick marks behind the hands
+    const refNode = svg.firstElementChild.nextSibling; // after the face circle
+    for (let i = 0; i < 60; i++) {
+      const isHour = i % 5 === 0;
+      const rad   = i * 6 * Math.PI / 180;
+      const inner = isHour ? 17 : 20.5;
+      const outer = 22.2;
+      const ln = document.createElementNS(ns, "line");
+      ln.setAttribute("x1", (24 + inner * Math.sin(rad)).toFixed(2));
+      ln.setAttribute("y1", (24 - inner * Math.cos(rad)).toFixed(2));
+      ln.setAttribute("x2", (24 + outer * Math.sin(rad)).toFixed(2));
+      ln.setAttribute("y2", (24 - outer * Math.cos(rad)).toFixed(2));
+      ln.setAttribute("stroke", isHour ? "#999" : "#ddd");
+      ln.setAttribute("stroke-width", isHour ? "1.4" : "0.7");
+      ln.setAttribute("stroke-linecap", "round");
+      svg.insertBefore(ln, refNode);
+    }
+    const hH = document.getElementById("clock-hour");
+    const mH = document.getElementById("clock-min");
+    const sH = document.getElementById("clock-sec");
+    function tick() {
+      const now = new Date();
+      const h  = now.getHours() % 12;
+      const m  = now.getMinutes();
+      const s  = now.getSeconds();
+      const ms = now.getMilliseconds();
+      hH.setAttribute("transform", `rotate(${(h*30 + m*0.5  + s/120).toFixed(3)},24,24)`);
+      mH.setAttribute("transform", `rotate(${(m*6  + s*0.1  + ms*0.0001).toFixed(3)},24,24)`);
+      sH.setAttribute("transform", `rotate(${(s*6  + ms*0.006).toFixed(3)},24,24)`);
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
+
+  // ── Weather (Open-Meteo, no API key required) ─────────
+  (function initWeather() {
+    const WMO = {
+      0:["☀️","Clear"], 1:["🌤","Mostly clear"], 2:["⛅","Partly cloudy"], 3:["☁️","Overcast"],
+      45:["🌫️","Fog"], 48:["🌫️","Freezing fog"],
+      51:["🌦️","Light drizzle"], 53:["🌦️","Drizzle"], 55:["🌦️","Heavy drizzle"],
+      61:["🌧️","Light rain"], 63:["🌧️","Rain"], 65:["🌧️","Heavy rain"],
+      71:["🌨️","Light snow"], 73:["🌨️","Snow"], 75:["🌨️","Heavy snow"], 77:["🌨️","Snow grains"],
+      80:["🌦️","Showers"], 81:["🌦️","Showers"], 82:["⛈️","Heavy showers"],
+      85:["🌨️","Snow showers"], 86:["🌨️","Heavy snow showers"],
+      95:["⛈️","Thunderstorm"], 96:["⛈️","Thunderstorm"], 99:["⛈️","Thunderstorm+hail"],
+    };
+    const API = "https://api.open-meteo.com/v1/forecast"
+      + "?latitude=35.4874&longitude=-80.6217"
+      + "&current=temperature_2m,apparent_temperature,weather_code"
+      + "&temperature_unit=fahrenheit&timezone=America%2FNew_York";
+    function fetch_weather() {
+      fetch(API)
+        .then(r => r.json())
+        .then(d => {
+          const c = d.current;
+          const [icon, desc] = WMO[c.weather_code] || ["🌡️", "Unknown"];
+          document.getElementById("weather-icon").textContent = icon;
+          document.getElementById("weather-temp").textContent = Math.round(c.temperature_2m) + "°F";
+          document.getElementById("weather-desc").textContent =
+            desc + " · feels " + Math.round(c.apparent_temperature) + "°";
+        })
+        .catch(() => {
+          document.getElementById("weather-desc").textContent = "Weather unavailable";
+        });
+    }
+    fetch_weather();
+    setInterval(fetch_weather, 600000);
+  })();
+
+  // ── Boot ─────────────────────────────────────────────
+  loadDismissed();
+  loadSnoozed();
+  loadData();
+  setTimeout(() => location.reload(), 30 * 60 * 1000);
+</script>
+</body>
+</html>
