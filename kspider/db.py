@@ -131,9 +131,10 @@ class Database:
 
         if dedupe:
             sql = f"""
-                SELECT r.* FROM results r
+                SELECT r.*, latest.first_seen FROM results r
                 INNER JOIN (
-                    SELECT url, MAX(id) AS max_id FROM results GROUP BY url
+                    SELECT url, MAX(id) AS max_id, MIN(fetched_at) AS first_seen
+                    FROM results GROUP BY url
                 ) latest ON r.id = latest.max_id
                 {where_clause}
                 ORDER BY r.id DESC

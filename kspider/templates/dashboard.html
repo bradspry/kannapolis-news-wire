@@ -568,6 +568,7 @@
     }
     .view-btn:hover { background: var(--bg); color: var(--text-2); }
     .view-btn.active { background: rgba(232,136,160,.12); color: var(--accent); }
+    .range-btn { font-size: 12px; font-weight: 500; padding: 7px 9px; }
 
     /* ── List view ────────────────────────────────────── */
     .chip-list { display: flex; flex-direction: column; gap: 3px; }
@@ -746,6 +747,13 @@
       </div>
       <span class="count-label" id="count-label"></span>
       <button class="btn" id="btn-mark-read">Mark all as read</button>
+      <div class="view-toggle" id="range-toggle" title="Show stories first seen within…">
+        <button class="view-btn range-btn" data-days="1">1d</button>
+        <button class="view-btn range-btn" data-days="3">3d</button>
+        <button class="view-btn range-btn" data-days="5">5d</button>
+        <button class="view-btn range-btn" data-days="7">7d</button>
+        <button class="view-btn range-btn" data-days="0">All</button>
+      </div>
       <div class="view-toggle">
         <button class="view-btn active" id="btn-view-chip" title="Card view">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="9" y="1" width="5" height="5" rx="1"/><rect x="1" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
@@ -771,7 +779,7 @@
   // ── State ────────────────────────────────────────────
   let all = [];
   let cachedStats = null;
-  const state = { source: null, query: null, text: "", view: "chip" };
+  const state = { source: null, query: null, text: "", view: "chip", days: 7 };
   let dismissed = new Set();
 
   // Normalize a URL so that the same article with different tracking params or
@@ -1154,6 +1162,18 @@
 
   let showBlocked = false;
 
+  // Day-range filter: keep stories first seen within the last state.days days (0 = all).
+  function inRange(r) {
+    if (!state.days) return true;
+    const t = toDate(r.first_seen || r.fetched_at);
+    return !t || Date.now() - t.getTime() <= state.days * 86400000;
+  }
+
+  function renderRangeToggle() {
+    document.querySelectorAll("#range-toggle .range-btn").forEach(b =>
+      b.classList.toggle("active", Number(b.dataset.days) === state.days));
+  }
+
   // ── Render chips ─────────────────────────────────────
   function visibleItems() {
     // Text search spans everything including dismissed; otherwise respect show/hide state
@@ -1162,6 +1182,7 @@
       : showBlocked
         ? all.filter(r => dismissed.has(normalizeUrl(r.url)))
         : all.filter(r => !dismissed.has(normalizeUrl(r.url)) && !snoozed.has(normalizeUrl(r.url)));
+    items = items.filter(inRange);
     if (state.source) items = items.filter(r => r.source === state.source);
     if (state.query)  items = items.filter(r => r.query  === state.query);
     if (state.text) {
@@ -1275,7 +1296,7 @@
 
     const btnBlocked = document.getElementById("btn-show-blocked");
     const hiddenInView = all.filter(r =>
-      dismissed.has(normalizeUrl(r.url)) &&
+      dismissed.has(normalizeUrl(r.url)) && inRange(r) &&
       (!state.source || r.source === state.source) &&
       (!state.query  || r.query  === state.query)
     ).length;
@@ -1340,7 +1361,12 @@
   // ── Render sidebar ────────────────────────────────────
   function renderSidebar() {
     if (!cachedStats) return;
-    const s = cachedStats;
+    const unread = all.filter(r => !dismissed.has(normalizeUrl(r.url)) && inRange(r));
+    const s = {
+      total: unread.length,
+      by_source: unread.reduce((acc, r) => { acc[r.source] = (acc[r.source] || 0) + 1; return acc; }, {}),
+      by_query:  unread.reduce((acc, r) => { acc[r.query]  = (acc[r.query]  || 0) + 1; return acc; }, {}),
+    };
 
 
     // Sources
@@ -1401,6 +1427,8 @@
       state.query  = saved.query  || null;
       state.text   = saved.text   || "";
       state.view   = saved.view   || "chip";
+      state.days   = typeof saved.days === "number" ? saved.days : 7;
+      renderRangeToggle();
       document.getElementById("search-input").value = state.text;
       document.getElementById("btn-view-chip").classList.toggle("active", state.view === "chip");
       document.getElementById("btn-view-list").classList.toggle("active", state.view === "list");
@@ -1436,6 +1464,14 @@
   document.getElementById("btn-show-blocked").addEventListener("click", () => {
     showBlocked = !showBlocked;
     render();
+  });
+
+  document.getElementById("range-toggle").addEventListener("click", e => {
+    const btn = e.target.closest(".range-btn");
+    if (!btn) return;
+    state.days = Number(btn.dataset.days);
+    renderRangeToggle();
+    saveState(); render();
   });
 
   document.getElementById("btn-view-chip").addEventListener("click", () => {
