@@ -779,12 +779,20 @@
   // ── State ────────────────────────────────────────────
   let all = [];
   let cachedStats = null;
-  const state = { source: null, query: null, text: "", view: "chip", days: 7 };
+  const state = { source: null, query: null, text: "", view: "chip", days: 1 };
   let dismissed = new Set();
 
   // Normalize a URL so that the same article with different tracking params or
   // MSN category-path variants all map to one canonical key for block matching.
+  // normalizeUrl runs on every story for every render; memoize it.
+  const _normCache = new Map();
   function normalizeUrl(url) {
+    let n = _normCache.get(url);
+    if (n === undefined) { n = _normalizeUrl(url); _normCache.set(url, n); }
+    return n;
+  }
+
+  function _normalizeUrl(url) {
     try {
       let u = new URL(url);
       // Decode Bing click-tracking redirects (bing.com/ck/a?...&u=a1<base64>...).
@@ -811,7 +819,10 @@
       }
       // Strip common tracking / session query params that change between crawl runs.
       ['utm_source','utm_medium','utm_campaign','utm_content','utm_term',
-       'fbclid','gclid','msclkid','ocid','ref','ceid','form','mkt','msockid'].forEach(k => u.searchParams.delete(k));
+       'fbclid','gclid','msclkid','ocid','ref','ceid','form','mkt','msockid'].forEach(k => {
+        // delete() re-serializes the whole URL even when k is absent, so check first.
+        if (u.searchParams.has(k)) u.searchParams.delete(k);
+      });
       u.hash = '';
       return u.toString();
     } catch { return url; }
@@ -830,8 +841,15 @@
       }
     } catch {}
   }
-  function saveDismissed() {
-    try { localStorage.setItem("kspider_dismissed", JSON.stringify([...dismissed])); } catch {}
+  // Merge with what's stored before writing, so a tab with a stale copy can't
+  // wipe out stories another tab marked read. `removed` is an unblocked URL.
+  function saveDismissed(removed) {
+    try {
+      JSON.parse(localStorage.getItem("kspider_dismissed") || "[]")
+        .map(normalizeUrl)
+        .forEach(u => { if (u !== removed) dismissed.add(u); });
+      localStorage.setItem("kspider_dismissed", JSON.stringify([...dismissed]));
+    } catch {}
   }
 
   function blockUrl(url) {
@@ -1427,7 +1445,9 @@
       state.query  = saved.query  || null;
       state.text   = saved.text   || "";
       state.view   = saved.view   || "chip";
-      state.days   = typeof saved.days === "number" ? saved.days : 7;
+      // Range resets to 1d on each fresh open; sessionStorage keeps it across auto-refreshes.
+      const days = parseInt(sessionStorage.getItem("kspider_days"), 10);
+      state.days = Number.isNaN(days) ? 1 : days;
       renderRangeToggle();
       document.getElementById("search-input").value = state.text;
       document.getElementById("btn-view-chip").classList.toggle("active", state.view === "chip");
@@ -1470,6 +1490,7 @@
     const btn = e.target.closest(".range-btn");
     if (!btn) return;
     state.days = Number(btn.dataset.days);
+    try { sessionStorage.setItem("kspider_days", String(state.days)); } catch {}
     renderRangeToggle();
     saveState(); render();
   });
@@ -1545,7 +1566,7 @@
       e.preventDefault(); e.stopPropagation();
       const url = unblock.dataset.unblockUrl;
       dismissed.delete(normalizeUrl(url));
-      saveDismissed();
+      saveDismissed(normalizeUrl(url));
       const stillHidden = all.some(r => dismissed.has(normalizeUrl(r.url)) && (!state.source || r.source === state.source) && (!state.query || r.query === state.query));
       if (!stillHidden) showBlocked = false;
       render();
@@ -1657,6 +1678,10 @@
 
   // ── Boot ─────────────────────────────────────────────
   loadDismissed();
+  // Pick up stories marked read in other dashboard tabs.
+  window.addEventListener("storage", e => {
+    if (e.key === "kspider_dismissed") { loadDismissed(); render(); }
+  });
   loadSnoozed();
   loadData();
   setTimeout(() => location.reload(), 30 * 60 * 1000);
