@@ -3,6 +3,8 @@
 
 # Generated dashboard export (contains locally scraped data)
 dashboard/kcat.html
+# Local Safari storage wipe detector
+dashboard/storage-test.html
 
 # Local data
 *.db
