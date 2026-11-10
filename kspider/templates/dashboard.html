@@ -864,6 +864,7 @@
   }
 
   const MTG_SOURCES = new Set(["CivicClerk", "CabarrusCommissioners"]);
+  const RECENT_MTG_DAYS = 30; // past meetings this recent sort above upcoming ones
 
   // Meeting times are local wall-clock values stored with a UTC marker
   // ("18:00Z" means 6:00 PM local), so drop the offset and parse as local.
@@ -1287,12 +1288,19 @@
     const items = visibleItems();
     const byNewest = (a, b) =>
       new Date(b.published_at || b.fetched_at || 0) - new Date(a.published_at || a.fetched_at || 0);
-    // Meetings: upcoming first (next meeting at top), then past meetings newest first.
+    // Meetings: past meetings from the last RECENT_MTG_DAYS first (minutes are often
+    // posted afterward), then upcoming (next meeting first), then older past meetings.
+    // Past groups are newest first.
+    const mtgGroup = r => {
+      if (isUpcomingMeeting(r)) return 1;
+      const d = meetingDate(r);
+      return d && Date.now() - d.getTime() <= RECENT_MTG_DAYS * 86400000 ? 0 : 2;
+    };
     const byMeeting = (a, b) => {
-      const aUp = isUpcomingMeeting(a), bUp = isUpcomingMeeting(b);
-      if (aUp !== bUp) return aUp ? -1 : 1;
+      const ga = mtgGroup(a), gb = mtgGroup(b);
+      if (ga !== gb) return ga - gb;
       const at = (meetingDate(a) || 0) - 0, bt = (meetingDate(b) || 0) - 0;
-      return aUp ? at - bt : bt - at;
+      return ga === 1 ? at - bt : bt - at;
     };
     const mtgSourceSelected = MTG_SOURCES.has(state.source);
     items.sort((a, b) => {
