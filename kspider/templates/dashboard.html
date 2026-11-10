@@ -425,6 +425,7 @@
       vertical-align: middle; white-space: nowrap;
     }
     .cal-unsnooze:hover { background: #3d2f6a; }
+    .cal-autosnooze, .cal-autosnooze:hover { cursor: default; background: #5c4a8a; }
     #toast {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
       background: #323232; color: #fff; padding: 10px 20px; border-radius: 8px;
@@ -911,6 +912,20 @@
     render();
     if (calOpen) renderCalendar();
   }
+  // Meetings more than SNOOZE_BEYOND_DAYS out are auto-snoozed (hidden, not stored)
+  // until they come within that window, or earlier if their agenda is posted.
+  const SNOOZE_BEYOND_DAYS = 30;
+  function autoSnoozeUntil(r) {
+    if (!MTG_SOURCES.has(r.source) || agendaPosted(r)) return null;
+    const d = meetingDate(r);
+    if (!d) return null;
+    const wake = new Date(d.getTime() - SNOOZE_BEYOND_DAYS * 86400000);
+    return wake.getTime() > Date.now() ? wake : null;
+  }
+  function isSnoozed(r) {
+    return snoozed.has(normalizeUrl(r.url)) || autoSnoozeUntil(r) !== null;
+  }
+
   function autoWakeSnoozed() {
     let woke = 0;
     all.forEach(r => {
@@ -1039,9 +1054,12 @@
       const agendaLabel = posted
         ? `<span class="cal-event-agenda-yes">Agenda posted</span>`
         : `<span class="cal-event-agenda-no">No agenda</span>`;
+      const autoWake = autoSnoozeUntil(m);
       const snoozeTag = isSnoozed
         ? `<button class="cal-unsnooze" data-url="${esc(m.url)}" title="Click to wake this chip">💤 Snoozed</button>`
-        : "";
+        : autoWake
+          ? `<span class="cal-unsnooze cal-autosnooze" title="Hidden until a month before the meeting or until its agenda is posted">💤 Until ${esc(autoWake.toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</span>`
+          : "";
       return `<a class="cal-event" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">
         <span class="cal-event-date ${dateClass}">${esc(dateStr)}</span>
         <span class="cal-event-title">${esc(m.title)}<br>
@@ -1238,10 +1256,10 @@
   function visibleItems() {
     // Text search spans everything including dismissed; otherwise respect show/hide state
     let items = state.text
-      ? all.filter(r => !snoozed.has(normalizeUrl(r.url)))
+      ? all.filter(r => !isSnoozed(r))
       : showBlocked
         ? all.filter(r => dismissed.has(normalizeUrl(r.url)))
-        : all.filter(r => !dismissed.has(normalizeUrl(r.url)) && !snoozed.has(normalizeUrl(r.url)));
+        : all.filter(r => !dismissed.has(normalizeUrl(r.url)) && !isSnoozed(r));
     items = items.filter(inRange);
     if (state.source) items = items.filter(r => r.source === state.source);
     if (state.query)  items = items.filter(r => r.query  === state.query);
@@ -1445,7 +1463,7 @@
   // ── Render sidebar ────────────────────────────────────
   function renderSidebar() {
     if (!cachedStats) return;
-    const unread = all.filter(r => !dismissed.has(normalizeUrl(r.url)) && inRange(r));
+    const unread = all.filter(r => !dismissed.has(normalizeUrl(r.url)) && !isSnoozed(r) && inRange(r));
     const s = {
       total: unread.length,
       by_source: unread.reduce((acc, r) => { acc[r.source] = (acc[r.source] || 0) + 1; return acc; }, {}),
@@ -1598,7 +1616,7 @@
     renderCalendar();
   });
   document.getElementById("cal-panel").addEventListener("click", e => {
-    const btn = e.target.closest(".cal-unsnooze");
+    const btn = e.target.closest(".cal-unsnooze:not(.cal-autosnooze)");
     if (btn) {
       e.preventDefault(); e.stopPropagation();
       unsnoozeUrl(btn.dataset.url);
