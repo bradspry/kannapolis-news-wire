@@ -327,6 +327,7 @@
       opacity: 0; transition: opacity .15s; white-space: nowrap; z-index: 2;
     }
     .chip:hover .chip-unblock, .list-item:hover .chip-unblock { opacity: 1; }
+    #btn-show-blocked:disabled { opacity: 0.5; cursor: default; }
     .btn-show-blocked-active { background: #1976d2 !important; color: #fff !important; border-color: #1976d2 !important; }
     .chip-share {
       position: absolute; bottom: 8px; right: 8px;
@@ -749,9 +750,9 @@
       <button class="btn" id="btn-mark-read">Mark all as read</button>
       <div class="view-toggle" id="range-toggle" title="Show stories first seen within…">
         <button class="view-btn range-btn" data-days="1">1d</button>
-        <button class="view-btn range-btn" data-days="3">3d</button>
         <button class="view-btn range-btn" data-days="5">5d</button>
-        <button class="view-btn range-btn" data-days="7">7d</button>
+        <button class="view-btn range-btn" data-days="15">15d</button>
+        <button class="view-btn range-btn" data-days="30">30d</button>
         <button class="view-btn range-btn" data-days="0">All</button>
       </div>
       <div class="view-toggle">
@@ -842,23 +843,54 @@
     } catch {}
   }
   // Merge with what's stored before writing, so a tab with a stale copy can't
-  // wipe out stories another tab marked read. `removed` is an unblocked URL.
+  // wipe out stories another tab marked read. `removed` is an unblocked URL
+  // (or a Set of them).
   function saveDismissed(removed) {
+    const isRemoved = removed instanceof Set ? u => removed.has(u) : u => u === removed;
     try {
       JSON.parse(localStorage.getItem("kspider_dismissed") || "[]")
         .map(normalizeUrl)
-        .forEach(u => { if (u !== removed) dismissed.add(u); });
+        .forEach(u => { if (!isRemoved(u)) dismissed.add(u); });
       localStorage.setItem("kspider_dismissed", JSON.stringify([...dismissed]));
     } catch {}
   }
 
   function blockUrl(url) {
+    const r = all.find(x => x.url === url);
+    if (r && isUpcomingMeeting(r)) return;  // never block meetings that haven't happened
     dismissed.add(normalizeUrl(url));
     saveDismissed();
     render();
   }
 
   const MTG_SOURCES = new Set(["CivicClerk", "CabarrusCommissioners"]);
+
+  // Meeting times are local wall-clock values stored with a UTC marker
+  // ("18:00Z" means 6:00 PM local), so drop the offset and parse as local.
+  function meetingDate(r) {
+    if (!r.published_at) return null;
+    const d = new Date(r.published_at.replace(/(Z|[+-]00:?00)$/, ""));
+    return isNaN(d) ? null : d;
+  }
+
+  // A meeting counts as "not happened yet" through the end of its day.
+  function isUpcomingMeeting(r) {
+    if (!MTG_SOURCES.has(r.source)) return false;
+    const d = meetingDate(r);
+    if (!d) return false;
+    const endOfDay = new Date(d); endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay.getTime() >= Date.now();
+  }
+
+  // Unblock any upcoming meetings that were blocked earlier.
+  function unblockUpcomingMeetings() {
+    const removed = new Set();
+    all.forEach(r => {
+      const n = normalizeUrl(r.url);
+      if (dismissed.has(n) && isUpcomingMeeting(r)) { dismissed.delete(n); removed.add(n); }
+    });
+    if (removed.size) saveDismissed(removed);
+  }
   let snoozed = new Set();
   function loadSnoozed() {
     try { snoozed = new Set(JSON.parse(localStorage.getItem("kspider_snoozed") || "[]").map(normalizeUrl)); }
@@ -1116,6 +1148,13 @@
   }
 
   function chipDate(r) {
+    if (MTG_SOURCES.has(r.source)) {
+      const d = meetingDate(r);
+      if (d) return d.toLocaleString("en-US", {
+        weekday: "short", month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit",
+      });
+    }
     return r.published_at ? relTime(r.published_at) : "";
   }
 
@@ -1158,6 +1197,7 @@
     const seen = new Set();
     all = data.results.filter(r => { const n = normalizeUrl(r.url); if (seen.has(n)) return false; seen.add(n); return true; });
     cachedStats = data.stats;
+    unblockUpcomingMeetings();
 
     // Recompute counts from visible (non-dismissed) items
     const visibleAll = all.filter(r => !dismissed.has(normalizeUrl(r.url)));
@@ -1179,6 +1219,7 @@
   }
 
   let showBlocked = false;
+  let rangeBeforeMtg = null;  // range to restore after leaving a meeting source
 
   // Day-range filter: keep stories first seen within the last state.days days (0 = all).
   function inRange(r) {
@@ -1215,7 +1256,7 @@
   }
 
   function markAllRead() {
-    visibleItems().forEach(r => dismissed.add(normalizeUrl(r.url)));
+    visibleItems().filter(r => !isUpcomingMeeting(r)).forEach(r => dismissed.add(normalizeUrl(r.url)));
     saveDismissed();
     render();
   }
@@ -1228,7 +1269,9 @@
     const isBlocked = dismissed.has(normalizeUrl(r.url));
     const action = isBlocked
       ? `<button class="chip-unblock" data-unblock-url="${esc(r.url)}">Unblock</button>`
-      : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
+      : isUpcomingMeeting(r)
+        ? ""
+        : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
     return `<a class="list-item${isBlocked ? ' is-blocked' : ''}" data-source="${esc(r.source)}"
                href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"
                title="${esc(r.title)}">
@@ -1242,16 +1285,27 @@
 
   function render() {
     const items = visibleItems();
+    const byNewest = (a, b) =>
+      new Date(b.published_at || b.fetched_at || 0) - new Date(a.published_at || a.fetched_at || 0);
+    // Meetings: upcoming first (next meeting at top), then past meetings newest first.
+    const byMeeting = (a, b) => {
+      const aUp = isUpcomingMeeting(a), bUp = isUpcomingMeeting(b);
+      if (aUp !== bUp) return aUp ? -1 : 1;
+      const at = (meetingDate(a) || 0) - 0, bt = (meetingDate(b) || 0) - 0;
+      return aUp ? at - bt : bt - at;
+    };
+    const mtgSourceSelected = MTG_SOURCES.has(state.source);
     items.sort((a, b) => {
+      if (mtgSourceSelected) return byMeeting(a, b);
+      // "All" range: plain most-recent-first, including meeting sources
+      if (!state.days) return byNewest(a, b);
       const aIsMtg = MTG_SOURCES.has(a.source);
       const bIsMtg = MTG_SOURCES.has(b.source);
-      // Meeting sources bubble to top, sorted ascending (next meeting first)
+      // Meeting sources bubble to top
       if (aIsMtg && !bIsMtg) return -1;
       if (!aIsMtg && bIsMtg) return 1;
-      if (aIsMtg && bIsMtg) {
-        return new Date(a.published_at || 0) - new Date(b.published_at || 0);
-      }
-      return new Date(b.published_at || b.fetched_at || 0) - new Date(a.published_at || a.fetched_at || 0);
+      if (aIsMtg && bIsMtg) return byMeeting(a, b);
+      return byNewest(a, b);
     });
 
     const grid = document.getElementById("chip-grid");
@@ -1318,7 +1372,9 @@
       (!state.source || r.source === state.source) &&
       (!state.query  || r.query  === state.query)
     ).length;
-    btnBlocked.style.display = (showBlocked || hiddenInView > 0) ? "" : "none";
+    // Always offer the toggle when a source/query is selected, even if nothing is blocked there.
+    btnBlocked.style.display = (showBlocked || hiddenInView > 0 || state.source || state.query) ? "" : "none";
+    btnBlocked.disabled = !showBlocked && hiddenInView === 0;
     btnBlocked.classList.toggle("btn-show-blocked-active", showBlocked);
     btnBlocked.textContent = showBlocked ? "Hide blocked" : `Show blocked (${hiddenInView})`;
 
@@ -1349,7 +1405,9 @@
     const isBlocked = dismissed.has(normalizeUrl(r.url));
     const action = isBlocked
       ? `<button class="chip-unblock" data-unblock-url="${esc(r.url)}">Unblock</button>`
-      : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
+      : isUpcomingMeeting(r)
+        ? ""
+        : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
     const share = `<button class="chip-share" data-share-url="${esc(r.url)}" title="Copy link to clipboard">Copy</button>`;
     const snoozeBtn = MTG_SOURCES.has(r.source) && !agendaPosted(r) && !isBlocked
       ? `<button class="chip-snooze" data-snooze-url="${esc(r.url)}" title="Snooze until agenda is posted">Zzz</button>`
@@ -1447,7 +1505,9 @@
       state.view   = saved.view   || "chip";
       // Range resets to 1d on each fresh open; sessionStorage keeps it across auto-refreshes.
       const days = parseInt(sessionStorage.getItem("kspider_days"), 10);
-      state.days = Number.isNaN(days) ? 1 : days;
+      // Fall back to 1d if the saved value isn't one of the current range buttons.
+      const validDays = [...document.querySelectorAll("#range-toggle .range-btn")].map(b => Number(b.dataset.days));
+      state.days = validDays.includes(days) ? days : 1;
       renderRangeToggle();
       document.getElementById("search-input").value = state.text;
       document.getElementById("btn-view-chip").classList.toggle("active", state.view === "chip");
@@ -1459,7 +1519,19 @@
   document.getElementById("source-nav").addEventListener("click", e => {
     const btn = e.target.closest(".nav-btn[data-src]");
     if (!btn) return;
+    const prevSource = state.source;
     state.source = btn.dataset.src === "" ? null : btn.dataset.src;
+    // Meeting sources are scheduled ahead, so most fall outside day ranges:
+    // jump to All when opening one, and restore the earlier range on leaving.
+    const wasMtg = MTG_SOURCES.has(prevSource), isMtg = MTG_SOURCES.has(state.source);
+    let newDays = state.days;
+    if (isMtg && !wasMtg) { rangeBeforeMtg = state.days; newDays = 0; }
+    else if (!isMtg && wasMtg && rangeBeforeMtg !== null) { newDays = rangeBeforeMtg; rangeBeforeMtg = null; }
+    if (newDays !== state.days) {
+      state.days = newDays;
+      try { sessionStorage.setItem("kspider_days", String(state.days)); } catch {}
+      renderRangeToggle();
+    }
     saveState();
     render();
   });
