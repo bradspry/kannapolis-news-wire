@@ -103,6 +103,11 @@ def _relevant(result, keyword: str) -> bool:
         result.title, result.snippet, result.url, result.source_domain
     ])).lower()
     return keyword in haystack
+# Sources whose items disappear from the feed once they end (e.g. cleared
+# traffic incidents). After a successful fetch, items not returned for this
+# many days are deleted.
+_PRUNE_AFTER_DAYS = {"NCDMV": 3}
+
 # Google News uses RSS (feedparser) so no scraping throttle needed
 _GOOGLE_SCRAPE_SOURCES = {"Bing", "Bing News", "Facebook", "Instagram"}
 
@@ -165,6 +170,10 @@ def run_search(
                     results = [r for r in results if _relevant(r, kw)]
             db.insert_results(run_id, results)
             total += len(results)
+            # Only prune after a successful fetch, so an API outage can't
+            # wipe out every incident.
+            if source in _PRUNE_AFTER_DAYS:
+                db.prune_stale(source, _PRUNE_AFTER_DAYS[source])
             if on_progress:
                 on_progress(query, source, len(results))
 

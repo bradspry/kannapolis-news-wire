@@ -161,6 +161,22 @@ class Database:
             (limit,),
         ).fetchall()
 
+    def prune_stale(self, source: str, days: int) -> int:
+        """Delete all rows for URLs of `source` not fetched in the last `days` days.
+
+        Returns the number of rows deleted.
+        """
+        from datetime import datetime, timedelta
+        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
+        cur = self._conn.execute(
+            """DELETE FROM results WHERE source = ? AND url IN (
+                   SELECT url FROM results WHERE source = ?
+                   GROUP BY url HAVING MAX(fetched_at) < ?)""",
+            (source, source, cutoff),
+        )
+        self._conn.commit()
+        return cur.rowcount
+
     def total_results(self) -> int:
         """Return the total number of stored results across all runs."""
         return self._conn.execute("SELECT COUNT(*) FROM results").fetchone()[0]
