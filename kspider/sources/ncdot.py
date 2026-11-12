@@ -23,13 +23,15 @@ _UA = (
 _RETRIES = 2
 _BACKOFF = 5
 
-# Bounding box for Cabarrus and Rowan counties (lat_min, lat_max, lon_min, lon_max)
-# Western edge set to ~county line to exclude Mecklenburg
-_BBOX = (35.20, 35.85, -80.74, -80.30)
+# Bounding box around Kannapolis city limits (lat_min, lat_max, lon_min, lon_max).
+# Covers I-85 from Kannapolis Pkwy (exit 54) to Old Beatty Ford Rd (exit 65,
+# annexed by Kannapolis) and the Rowan County part of the city; excludes
+# Concord Mills, Salisbury and Charlotte.
+_BBOX = (35.415, 35.570, -80.720, -80.540)
 
 
 def _in_area(lat: float, lon: float) -> bool:
-    """Check whether a coordinate falls within the Cabarrus/Rowan bounding box."""
+    """Check whether a coordinate falls within the Kannapolis bounding box."""
     lat_min, lat_max, lon_min, lon_max = _BBOX
     return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
@@ -45,7 +47,7 @@ def _unix_to_iso(val) -> Optional[str]:
 
 
 def search(query: str = "Kannapolis", max_results: int = 50) -> List[SearchResult]:
-    """Fetch NCDOT DriveNC traffic incidents within the local bounding box."""
+    """Fetch NCDOT DriveNC traffic incidents in or mentioning Kannapolis."""
     api_key = os.environ.get("DRIVENC_API_KEY", "")
     if not api_key:
         raise RuntimeError(
@@ -80,12 +82,17 @@ def search(query: str = "Kannapolis", max_results: int = 50) -> List[SearchResul
             if not isinstance(events, list):
                 raise RuntimeError(f"unexpected JSON shape: {text[:120]!r}")
 
+            # Keep events located in Kannapolis or that name it, newest first so
+            # the max_results cap never drops the most recent ones.
+            events = [
+                ev for ev in events
+                if _in_area(ev.get("Latitude") or 0.0, ev.get("Longitude") or 0.0)
+                or "kannapolis" in (ev.get("Description") or "").lower()
+            ]
+            events.sort(key=lambda ev: int(ev.get("StartDate") or 0), reverse=True)
+
             results = []
             for ev in events:
-                lat = ev.get("Latitude") or 0.0
-                lon = ev.get("Longitude") or 0.0
-                if not _in_area(lat, lon):
-                    continue
 
                 incident_id = str(ev.get("ID", ""))
                 road = (ev.get("RoadwayName") or "").strip()
