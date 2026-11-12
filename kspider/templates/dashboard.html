@@ -276,6 +276,7 @@
 
     /* ── Chip ─────────────────────────────────────────── */
     .chip {
+      position: relative;
       display: flex;
       flex-direction: column;
       background: var(--surface);
@@ -337,6 +338,12 @@
       display: flex; align-items: center; gap: 4px; text-decoration: none;
     }
     .chip:hover .chip-share { opacity: 1; }
+    .chip-new-attach {
+      position: absolute; bottom: 6px; right: 8px; z-index: 1;
+      font-size: 18px; line-height: 1; pointer-events: none;
+      transition: opacity .15s;
+    }
+    .chip:hover .chip-new-attach { opacity: 0; }
     .chip-share:hover { background: #5a5a7a; }
     .chip-cal {
       position: absolute; bottom: 8px; left: 8px;
@@ -901,8 +908,37 @@
   function saveSnoozed() {
     try { localStorage.setItem("kspider_snoozed", JSON.stringify([...snoozed])); } catch {}
   }
+  // Attachment tracking for meetings. attachSeen holds each meeting's last
+  // seen attachment count; when it goes up the meeting is flagged in attachNew
+  // (shows a 📎 until opened) and, if snoozed, woken. attachWoken holds
+  // auto-snoozed meetings woken that way; they stay visible until snoozed again.
+  let attachSeen = {}, attachWoken = new Set(), attachNew = new Set();
+  function loadAttachSeen() {
+    const read = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || d) || JSON.parse(d); } catch { return JSON.parse(d); } };
+    attachSeen  = read("kspider_attach_seen", "{}");
+    attachWoken = new Set(read("kspider_attach_woken", "[]"));
+    attachNew   = new Set(read("kspider_attach_new", "[]"));
+  }
+  function saveAttachSeen() {
+    try {
+      localStorage.setItem("kspider_attach_seen", JSON.stringify(attachSeen));
+      localStorage.setItem("kspider_attach_woken", JSON.stringify([...attachWoken]));
+      localStorage.setItem("kspider_attach_new", JSON.stringify([...attachNew]));
+    } catch {}
+  }
+  function attachmentCount(r) {
+    const m = (r.snippet || "").match(/(\d+)\s+attachments?\b/i);
+    return m ? parseInt(m[1], 10) : 0;
+  }
+
   function snoozeUrl(url) {
-    snoozed.add(normalizeUrl(url));
+    const nu = normalizeUrl(url);
+    snoozed.add(nu);
+    const r = all.find(x => normalizeUrl(x.url) === nu);
+    if (r) attachSeen[nu] = attachmentCount(r);
+    attachWoken.delete(nu);
+    attachNew.delete(nu);
+    saveAttachSeen();
     saveSnoozed();
     render();
   }
@@ -912,34 +948,51 @@
     render();
     if (calOpen) renderCalendar();
   }
-  // Meetings more than SNOOZE_BEYOND_DAYS out are auto-snoozed (hidden, not stored)
-  // until they come within that window, or earlier if their agenda is posted.
-  const SNOOZE_BEYOND_DAYS = 30;
-  function autoSnoozeUntil(r) {
-    if (!MTG_SOURCES.has(r.source) || agendaPosted(r)) return null;
-    const d = meetingDate(r);
-    if (!d) return null;
-    const wake = new Date(d.getTime() - SNOOZE_BEYOND_DAYS * 86400000);
-    return wake.getTime() > Date.now() ? wake : null;
+  // Upcoming meetings without a posted agenda are auto-snoozed (hidden, not
+  // stored) until the agenda is posted or new attachments appear. Past
+  // meetings are never auto-snoozed.
+  function isAutoSnoozed(r) {
+    return isUpcomingMeeting(r) && !agendaPosted(r) && !attachWoken.has(normalizeUrl(r.url));
   }
   function isSnoozed(r) {
-    return snoozed.has(normalizeUrl(r.url)) || autoSnoozeUntil(r) !== null;
+    return snoozed.has(normalizeUrl(r.url)) || isAutoSnoozed(r);
   }
 
+  // Runs on each load: wake snoozed meetings whose agenda is posted, and flag
+  // meetings whose attachment count went up since last seen. Flagged meetings
+  // are woken if snoozed, unblocked if marked read/blocked, and shown outside
+  // the day range until opened (see inRange).
   function autoWakeSnoozed() {
-    let woke = 0;
+    let agendaWoke = 0, attachWoke = 0;
+    const unblocked = new Set();
+    const live = new Set();
     all.forEach(r => {
+      if (!MTG_SOURCES.has(r.source)) return;
       const nu = normalizeUrl(r.url);
-      if (!MTG_SOURCES.has(r.source) || !snoozed.has(nu)) return;
-      if (agendaPosted(r)) {
-        snoozed.delete(nu);
-        woke++;
-      }
+      live.add(nu);
+      const wasAuto = isAutoSnoozed(r);
+      if (snoozed.has(nu) && agendaPosted(r)) { snoozed.delete(nu); agendaWoke++; }
+      const count = attachmentCount(r);
+      if (!(nu in attachSeen)) { attachSeen[nu] = count; return; }
+      if (count <= attachSeen[nu]) { attachSeen[nu] = count; return; }
+      attachSeen[nu] = count;
+      attachNew.add(nu);
+      let woke = false;
+      if (snoozed.has(nu)) { snoozed.delete(nu); woke = true; }
+      else if (wasAuto) { attachWoken.add(nu); woke = true; }
+      if (dismissed.delete(nu)) { unblocked.add(nu); woke = true; }
+      if (woke) attachWoke++;
     });
-    if (woke) {
-      saveSnoozed();
-      showToast(`${woke} snoozed meeting${woke > 1 ? "s" : ""} woke up — agenda posted!`);
-    }
+    // Forget meetings that are no longer in the data.
+    Object.keys(attachSeen).forEach(k => { if (!live.has(k)) delete attachSeen[k]; });
+    [attachWoken, attachNew].forEach(set => set.forEach(k => { if (!live.has(k)) set.delete(k); }));
+    saveAttachSeen();
+    if (agendaWoke || attachWoke) saveSnoozed();
+    if (unblocked.size) saveDismissed(unblocked);
+    const msgs = [];
+    if (agendaWoke) msgs.push(`${agendaWoke} snoozed meeting${agendaWoke > 1 ? "s" : ""} woke up — agenda posted!`);
+    if (attachWoke) msgs.push(`📎 ${attachWoke} meeting${attachWoke > 1 ? "s" : ""} back on the dashboard — new attachments!`);
+    if (msgs.length) showToast(msgs.join(" "));
   }
 
   const SOURCE_COLORS = {
@@ -1054,11 +1107,10 @@
       const agendaLabel = posted
         ? `<span class="cal-event-agenda-yes">Agenda posted</span>`
         : `<span class="cal-event-agenda-no">No agenda</span>`;
-      const autoWake = autoSnoozeUntil(m);
       const snoozeTag = isSnoozed
         ? `<button class="cal-unsnooze" data-url="${esc(m.url)}" title="Click to wake this chip">💤 Snoozed</button>`
-        : autoWake
-          ? `<span class="cal-unsnooze cal-autosnooze" title="Hidden until a month before the meeting or until its agenda is posted">💤 Until ${esc(autoWake.toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</span>`
+        : isAutoSnoozed(m)
+          ? `<span class="cal-unsnooze cal-autosnooze" title="Hidden until its agenda or new attachments are posted">💤 Until agenda</span>`
           : "";
       return `<a class="cal-event" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">
         <span class="cal-event-date ${dateClass}">${esc(dateStr)}</span>
@@ -1243,6 +1295,7 @@
   // Day-range filter: keep stories first seen within the last state.days days (0 = all).
   function inRange(r) {
     if (!state.days) return true;
+    if (attachNew.has(normalizeUrl(r.url))) return true;  // new attachments: show until opened
     const t = toDate(r.first_seen || r.fetched_at);
     return !t || Date.now() - t.getTime() <= state.days * 86400000;
   }
@@ -1436,9 +1489,12 @@
         : `<button class="chip-dismiss" data-dismiss-url="${esc(r.url)}" title="Never show again">&#x2715;</button>`;
     const share = `<button class="chip-share" data-share-url="${esc(r.url)}" title="Copy link to clipboard">Copy</button>`;
     const snoozeBtn = MTG_SOURCES.has(r.source) && !agendaPosted(r) && !isBlocked
-      ? `<button class="chip-snooze" data-snooze-url="${esc(r.url)}" title="Snooze until agenda is posted">Zzz</button>`
+      ? `<button class="chip-snooze" data-snooze-url="${esc(r.url)}" title="Snooze until agenda or new attachments are posted">Zzz</button>`
       : "";
     const calBtn = "";
+    const newAttach = attachNew.has(normalizeUrl(r.url))
+      ? `<span class="chip-new-attach" title="New attachments posted">📎</span>`
+      : "";
     return `<a class="chip${isBlocked ? ' is-blocked' : ''}" data-source="${esc(r.source)}"
                href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"
                title="${esc(r.title)}">
@@ -1446,6 +1502,7 @@
       ${snoozeBtn}
       ${share}
       ${calBtn}
+      ${newAttach}
       <div class="chip-accent"></div>
       ${thumb}
       <div class="chip-body">
@@ -1634,11 +1691,20 @@
   });
 
   document.getElementById("chip-grid").addEventListener("click", e => {
+    // Opening a meeting clears its new-attachments 📎.
+    const opened = e.target.closest("a.chip, a.list-item");
+    if (opened && !e.target.closest("button")) {
+      const nu = normalizeUrl(opened.getAttribute("href"));
+      if (attachNew.delete(nu)) {
+        saveAttachSeen();
+        opened.querySelector(".chip-new-attach")?.remove();
+      }
+    }
     const snooze = e.target.closest(".chip-snooze");
     if (snooze) {
       e.preventDefault(); e.stopPropagation();
       snoozeUrl(snooze.dataset.snoozeUrl);
-      showToast("Snoozed — will reappear when agenda is posted.");
+      showToast("Snoozed — will reappear when the agenda or new attachments are posted.");
       return;
     }
     const cal = e.target.closest(".chip-cal");
@@ -1781,6 +1847,7 @@
     if (e.key === "kspider_dismissed") { loadDismissed(); render(); }
   });
   loadSnoozed();
+  loadAttachSeen();
   loadData();
   setTimeout(() => location.reload(), 30 * 60 * 1000);
 </script>
