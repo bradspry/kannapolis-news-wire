@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS results (
     thumbnail_url   TEXT,
     source_domain   TEXT,
     published_at    TEXT,
-    fetched_at      TEXT    NOT NULL
+    fetched_at      TEXT    NOT NULL,   -- last time this item was fetched
+    first_seen      TEXT                -- first time this item was fetched
 );
 
 CREATE INDEX IF NOT EXISTS idx_results_query   ON results(query);
@@ -60,7 +61,24 @@ class Database:
         self._conn = sqlite3.connect(str(path))
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add first_seen to databases created before it existed, filled from
+        the earliest fetch of each URL (when every fetch was its own row)."""
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(results)")}
+        if "first_seen" in cols:
+            return
+        self._conn.executescript("""
+            ALTER TABLE results ADD COLUMN first_seen TEXT;
+            CREATE TEMP TABLE _first AS
+                SELECT url, MIN(fetched_at) AS first_seen FROM results GROUP BY url;
+            CREATE INDEX temp._first_url ON _first(url);
+            UPDATE results SET first_seen =
+                (SELECT first_seen FROM _first WHERE _first.url = results.url);
+            DROP TABLE _first;
+        """)
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
@@ -85,23 +103,31 @@ class Database:
         return cur.lastrowid
 
     def insert_results(self, run_id: int, results: List[SearchResult]) -> None:
-        """Bulk-insert search results tied to the given run ID."""
-        rows = [
-            (
-                run_id,
-                r.query, r.source, r.title, r.url,
-                r.snippet, r.thumbnail_url, r.source_domain,
-                r.published_at, r.fetched_at,
+        """Store search results for the given run.
+
+        An item already stored for the same source and URL is updated in place
+        (latest title, snippet, fetch time and run) instead of saved again;
+        its first_seen is kept.
+        """
+        for r in results:
+            cur = self._conn.execute(
+                """UPDATE results SET
+                       search_run_id = ?, query = ?, title = ?, snippet = ?,
+                       thumbnail_url = ?, source_domain = ?,
+                       published_at = COALESCE(?, published_at), fetched_at = ?
+                   WHERE id = (SELECT MAX(id) FROM results WHERE url = ? AND source = ?)""",
+                (run_id, r.query, r.title, r.snippet, r.thumbnail_url, r.source_domain,
+                 r.published_at, r.fetched_at, r.url, r.source),
             )
-            for r in results
-        ]
-        self._conn.executemany(
-            """INSERT INTO results
-               (search_run_id, query, source, title, url, snippet,
-                thumbnail_url, source_domain, published_at, fetched_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            rows,
-        )
+            if cur.rowcount == 0:
+                self._conn.execute(
+                    """INSERT INTO results
+                       (search_run_id, query, source, title, url, snippet, thumbnail_url,
+                        source_domain, published_at, fetched_at, first_seen)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (run_id, r.query, r.source, r.title, r.url, r.snippet, r.thumbnail_url,
+                     r.source_domain, r.published_at, r.fetched_at, r.fetched_at),
+                )
         self._conn.commit()
 
     # ------------------------------------------------------------------ reads
@@ -130,14 +156,21 @@ class Database:
         where_clause = ("WHERE " + " AND ".join(where)) if where else ""
 
         if dedupe:
+            # One row per URL: its most recently fetched row, plus the earliest
+            # first_seen across all its rows.
+            where_clause_rn = "WHERE " + " AND ".join(["r.rn = 1"] + where)
+            cols = ", ".join(f"r.{c}" for c in (
+                "id", "search_run_id", "query", "source", "title", "url", "snippet",
+                "thumbnail_url", "source_domain", "published_at", "fetched_at"))
             sql = f"""
-                SELECT r.*, latest.first_seen FROM results r
-                INNER JOIN (
-                    SELECT url, MAX(id) AS max_id, MIN(fetched_at) AS first_seen
-                    FROM results GROUP BY url
-                ) latest ON r.id = latest.max_id
-                {where_clause}
-                ORDER BY r.id DESC
+                SELECT {cols}, r.first_seen FROM (
+                    SELECT {cols},
+                           MIN(COALESCE(r.first_seen, r.fetched_at)) OVER (PARTITION BY r.url) AS first_seen,
+                           ROW_NUMBER() OVER (PARTITION BY r.url ORDER BY r.fetched_at DESC, r.id DESC) AS rn
+                    FROM results r
+                ) r
+                {where_clause_rn}
+                ORDER BY r.fetched_at DESC, r.id DESC
                 LIMIT ? OFFSET ?
             """
         else:
