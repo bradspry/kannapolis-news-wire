@@ -258,6 +258,18 @@
       box-shadow: 0 0 0 3px rgba(232, 136, 160, .18);
     }
     .search-input::placeholder { color: var(--text-3); }
+    .search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+    .search-input { padding-right: 40px; }
+    .search-clear {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: var(--accent); color: #1a1a1a;
+      font-size: 14px; font-weight: 700; line-height: 1;
+      display: none; align-items: center; justify-content: center; cursor: pointer;
+      transition: filter .15s;
+    }
+    .search-clear.visible { display: flex; }
+    .search-clear:hover { filter: brightness(1.12); }
 
     .count-label {
       font-size: 13px;
@@ -753,6 +765,7 @@
       <div class="search-wrap">
         <span class="search-icon">⌕</span>
         <input class="search-input" id="search-input" type="search" placeholder="Filter results…" autocomplete="off">
+        <button class="search-clear" id="search-clear" type="button" title="Clear search" aria-label="Clear search">&#x2715;</button>
       </div>
       <span class="count-label" id="count-label"></span>
       <button class="btn" id="btn-mark-read">Mark all as read</button>
@@ -1593,6 +1606,7 @@
       state.days = validDays.includes(days) ? days : 1;
       renderRangeToggle();
       document.getElementById("search-input").value = state.text;
+      document.getElementById("search-clear").classList.toggle("visible", state.text !== "");
       document.getElementById("btn-view-chip").classList.toggle("active", state.view === "chip");
       document.getElementById("btn-view-list").classList.toggle("active", state.view === "list");
     } catch {}
@@ -1627,10 +1641,39 @@
     render();
   });
 
-  document.getElementById("search-input").addEventListener("input", e => {
-    state.text = e.target.value;
+  // Search waits until typing pauses and needs at least 2 characters, so
+  // single keystrokes don't re-filter every result. Clearing applies at once.
+  const SEARCH_DELAY_MS = 250, SEARCH_MIN_CHARS = 2;
+  const searchInput = document.getElementById("search-input");
+  const searchClear = document.getElementById("search-clear");
+  let searchTimer = null;
+  function applySearch() {
+    clearTimeout(searchTimer);
+    const v = searchInput.value.trim();
+    const text = v.length >= SEARCH_MIN_CHARS ? searchInput.value : "";
+    if (text === state.text) return;
+    state.text = text;
     saveState();
     render();
+  }
+  function syncSearchClear() {
+    searchClear.classList.toggle("visible", searchInput.value !== "");
+  }
+  searchInput.addEventListener("input", () => {
+    syncSearchClear();
+    clearTimeout(searchTimer);
+    if (searchInput.value === "") applySearch();
+    else searchTimer = setTimeout(applySearch, SEARCH_DELAY_MS);
+  });
+  searchInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") applySearch();
+    if (e.key === "Escape" && searchInput.value) { searchInput.value = ""; syncSearchClear(); applySearch(); }
+  });
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    syncSearchClear();
+    applySearch();
+    searchInput.focus();
   });
 
   document.getElementById("btn-mark-read").addEventListener("click", markAllRead);
