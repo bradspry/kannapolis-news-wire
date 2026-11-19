@@ -963,9 +963,16 @@
   }
   // Upcoming meetings without a posted agenda are auto-snoozed (hidden, not
   // stored) until the agenda is posted or new attachments appear. Past
-  // meetings are never auto-snoozed.
+  // meetings, and meetings within AUTO_SNOOZE_GRACE_DAYS, are never
+  // auto-snoozed so imminent meetings stay visible even without an agenda.
+  const AUTO_SNOOZE_GRACE_DAYS = 7;
+  function isImminentMeeting(r) {
+    const d = meetingDate(r);
+    return !!d && d.getTime() - Date.now() <= AUTO_SNOOZE_GRACE_DAYS * 86400000;
+  }
   function isAutoSnoozed(r) {
-    return isUpcomingMeeting(r) && !agendaPosted(r) && !attachWoken.has(normalizeUrl(r.url));
+    return isUpcomingMeeting(r) && !isImminentMeeting(r) && !agendaPosted(r)
+        && !attachWoken.has(normalizeUrl(r.url));
   }
   function isSnoozed(r) {
     return snoozed.has(normalizeUrl(r.url)) || isAutoSnoozed(r);
